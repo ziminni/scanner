@@ -1,0 +1,100 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function userProfile() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function activeUser() {
+      return signedIn() && userProfile().status == 'active';
+    }
+
+    function role() {
+      return userProfile().role;
+    }
+
+    function systemAdmin() {
+      return activeUser() && role() == 'system_administrator';
+    }
+
+    function bootstrapSystemAdmin(userId) {
+      return signedIn()
+        && request.auth.uid == 'FKg721Q77UdegDvMf8boGYcEYd53'
+        && userId == 'FKg721Q77UdegDvMf8boGYcEYd53'
+        && request.auth.token.email == 'systemadmin@user.com'
+        && request.resource.data.email == 'systemadmin@user.com'
+        && request.resource.data.role == 'system_administrator'
+        && request.resource.data.status == 'active';
+    }
+
+    function schoolAdmin() {
+      return activeUser() && role() in ['system_administrator', 'school_administrator'];
+    }
+
+    function scanner() {
+      return activeUser() && role() in ['system_administrator', 'staff_scanner'];
+    }
+
+    match /users/{userId} {
+      allow read: if activeUser();
+      allow create: if systemAdmin() || bootstrapSystemAdmin(userId);
+      allow update, delete: if systemAdmin();
+    }
+
+    match /attendance_logs/{logId} {
+      allow read: if activeUser();
+      allow create: if scanner() || schoolAdmin();
+      allow update, delete: if systemAdmin() || schoolAdmin();
+    }
+
+    match /audit_logs/{logId} {
+      allow read: if systemAdmin();
+      allow create: if activeUser();
+      allow update, delete: if false;
+    }
+
+    match /students/{id} {
+      allow read: if activeUser();
+      allow write: if schoolAdmin();
+    }
+
+    match /teachers/{id} {
+      allow read: if activeUser();
+      allow write: if schoolAdmin();
+    }
+
+    match /sections/{id} {
+      allow read: if activeUser();
+      allow write: if schoolAdmin();
+    }
+
+    match /school_years/{id} {
+      allow read: if activeUser();
+      allow write: if schoolAdmin();
+    }
+
+    match /school_years/{schoolYearId}/attendance_logs/{logId} {
+      allow read: if activeUser();
+      allow create: if scanner() || schoolAdmin();
+      allow update, delete: if systemAdmin() || schoolAdmin();
+    }
+
+    match /school_years/{schoolYearId}/students/{studentId} {
+      allow read: if activeUser();
+      allow write: if schoolAdmin();
+    }
+
+    match /school_years/{schoolYearId}/teachers/{teacherId} {
+      allow read: if activeUser();
+      allow write: if schoolAdmin();
+    }
+
+    match /{collection}/{id} {
+      allow read, write: if systemAdmin();
+    }
+  }
+}
