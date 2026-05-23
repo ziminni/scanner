@@ -1373,10 +1373,12 @@ class _CrudPage extends StatefulWidget {
 class _CrudPageState extends State<_CrudPage> {
   late final Map<String, TextEditingController> _controllers = {
     for (final field in widget.fields)
-      if (field != 'status' && !_usesDropdown(field))
+      if (field != 'status' && !_usesDropdown(field) && !_usesTimePicker(field))
         field: TextEditingController(),
   };
   DateTime? _birthdate;
+  TimeOfDay? _assignedTimeIn;
+  TimeOfDay? _assignedTimeOut;
   _TeacherOption? _selectedAdviser;
 
   @override
@@ -1414,6 +1416,14 @@ class _CrudPageState extends State<_CrudPage> {
                 'adviserTeacherId': _selectedAdviser?.teacherId ?? '',
                 'adviserDocId': _selectedAdviser?.docId ?? '',
               },
+              if (widget.fields.contains('assignedTimeIn'))
+                'assignedTimeIn': _timeToStorage(
+                  _assignedTimeIn ?? const TimeOfDay(hour: 7, minute: 0),
+                ),
+              if (widget.fields.contains('assignedTimeOut'))
+                'assignedTimeOut': _timeToStorage(
+                  _assignedTimeOut ?? const TimeOfDay(hour: 17, minute: 0),
+                ),
               if (widget.fields.contains('status')) 'status': 'Active',
               'archived': false,
               'createdAt': FieldValue.serverTimestamp(),
@@ -1461,6 +1471,27 @@ class _CrudPageState extends State<_CrudPage> {
                         setState(() => _selectedAdviser = teacher),
                   ),
                 ),
+              if (widget.fields.contains('assignedTimeIn'))
+                SizedBox(
+                  width: 220,
+                  child: _TimePickerField(
+                    label: 'Assigned Time In',
+                    value: _assignedTimeIn,
+                    fallback: const TimeOfDay(hour: 7, minute: 0),
+                    onChanged: (time) => setState(() => _assignedTimeIn = time),
+                  ),
+                ),
+              if (widget.fields.contains('assignedTimeOut'))
+                SizedBox(
+                  width: 220,
+                  child: _TimePickerField(
+                    label: 'Assigned Time Out',
+                    value: _assignedTimeOut,
+                    fallback: const TimeOfDay(hour: 17, minute: 0),
+                    onChanged: (time) =>
+                        setState(() => _assignedTimeOut = time),
+                  ),
+                ),
             ],
           ),
           const SizedBox(height: 16),
@@ -1476,6 +1507,10 @@ class _CrudPageState extends State<_CrudPage> {
   bool _usesDropdown(String field) =>
       widget.collection == 'sections' && field == 'adviser';
 
+  bool _usesTimePicker(String field) =>
+      widget.collection == 'teachers' &&
+      (field == 'assignedTimeIn' || field == 'assignedTimeOut');
+
   Widget _fieldInput(MapEntry<String, TextEditingController> entry) {
     if (entry.key == 'birthdate') {
       return _BirthdateField(
@@ -1486,6 +1521,48 @@ class _CrudPageState extends State<_CrudPage> {
     return TextField(
       controller: entry.value,
       decoration: InputDecoration(labelText: _label(entry.key)),
+    );
+  }
+
+  String _timeToStorage(TimeOfDay time) {
+    final hour = time.hour.toString().padLeft(2, '0');
+    final minute = time.minute.toString().padLeft(2, '0');
+    return '$hour:$minute';
+  }
+}
+
+class _TimePickerField extends StatelessWidget {
+  const _TimePickerField({
+    required this.label,
+    required this.value,
+    required this.fallback,
+    required this.onChanged,
+  });
+
+  final String label;
+  final TimeOfDay? value;
+  final TimeOfDay fallback;
+  final ValueChanged<TimeOfDay> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final displayValue = value ?? fallback;
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: () async {
+        final picked = await showTimePicker(
+          context: context,
+          initialTime: displayValue,
+        );
+        if (picked != null) onChanged(picked);
+      },
+      child: InputDecorator(
+        decoration: const InputDecoration(
+          labelText: '',
+          suffixIcon: Icon(Icons.schedule_outlined),
+        ).copyWith(labelText: label),
+        child: Text(displayValue.format(context)),
+      ),
     );
   }
 }
