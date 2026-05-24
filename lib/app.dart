@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'core/constants/strings.dart';
 import 'core/services/app_controller.dart';
 import 'core/theme/app_theme.dart';
-import 'features/auth/view/login_screen.dart';
+import 'screens/auth/login_screen.dart';
 import 'shared/layouts/app_shell.dart';
 
 class AttendanceApp extends StatelessWidget {

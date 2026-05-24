@@ -2,6 +2,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/services/app_controller.dart';
+import '../../models/models.dart';
+
 class MetricCard extends StatelessWidget {
   const MetricCard({
     super.key,
@@ -85,6 +88,38 @@ class FirestoreCount extends StatelessWidget {
       future: query.count().get(),
       builder: (context, snapshot) =>
           builder((snapshot.data?.count ?? 0).toString()),
+    );
+  }
+}
+
+class ActiveSchoolYearCount extends StatelessWidget {
+  const ActiveSchoolYearCount({
+    super.key,
+    required this.collection,
+    required this.builder,
+    this.filters = const {},
+  });
+
+  final String collection;
+  final Map<String, Object?> filters;
+  final Widget Function(String value) builder;
+
+  @override
+  Widget build(BuildContext context) {
+    final app = AppScope.of(context);
+    return FutureBuilder<SchoolYear?>(
+      future: app.attendance.activeSchoolYear(),
+      builder: (context, snapshot) {
+        final schoolYear = snapshot.data;
+        if (schoolYear == null) return builder('0');
+        Query<Map<String, dynamic>> query = app.firestore
+            .collectionGroup(collection)
+            .where('schoolYearId', isEqualTo: schoolYear.id);
+        for (final entry in filters.entries) {
+          query = query.where(entry.key, isEqualTo: entry.value);
+        }
+        return FirestoreCount(query: query, builder: builder);
+      },
     );
   }
 }

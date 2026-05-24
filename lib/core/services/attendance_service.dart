@@ -18,23 +18,44 @@ class AttendanceService {
   final OfflineQueueService _queue;
   final AuditService _audit;
   final _uuid = const Uuid();
+  SchoolYear? _activeSchoolYearCache;
 
   Stream<QuerySnapshot<Map<String, dynamic>>> logsStream({int limit = 200}) {
-    return _firestore
-        .collection('attendance_logs')
-        .orderBy('timestamp', descending: true)
-        .limit(limit)
-        .snapshots();
+    return (() async* {
+      final schoolYear = await activeSchoolYear();
+      if (schoolYear == null) return;
+      yield* _firestore
+          .collection('school_years')
+          .doc(schoolYear.id)
+          .collection('attendance_logs')
+          .orderBy('timestamp', descending: true)
+          .limit(limit)
+          .snapshots();
+    })();
   }
 
-  Future<SchoolYear?> activeSchoolYear() async {
+  Future<SchoolYear?> activeSchoolYear({bool forceRefresh = false}) async {
+    final cached = _activeSchoolYearCache;
+    if (!forceRefresh && cached != null && !cached.isFinished(DateTime.now())) {
+      return cached;
+    }
+
+    final online = await _queue.isOnline;
+    if (!online) {
+      _activeSchoolYearCache = await _queue.loadCachedActiveSchoolYear();
+      return _activeSchoolYearCache;
+    }
+
     final query = await _firestore
         .collection('school_years')
         .where('isActive', isEqualTo: true)
         .where('archived', isEqualTo: false)
         .limit(1)
         .get();
-    if (query.docs.isEmpty) return null;
+    if (query.docs.isEmpty) {
+      _activeSchoolYearCache = null;
+      return null;
+    }
     final schoolYear = SchoolYear.fromDoc(query.docs.first);
     if (schoolYear.isFinished(DateTime.now())) {
       await archiveSchoolYear(
@@ -43,8 +64,11 @@ class AttendanceService {
         actorName: 'System',
         reason: 'final_term_ended',
       );
+      _activeSchoolYearCache = null;
       return null;
     }
+    _activeSchoolYearCache = schoolYear;
+    await _queue.cacheActiveSchoolYear(schoolYear);
     return schoolYear;
   }
 
@@ -75,6 +99,13 @@ class AttendanceService {
       target: schoolYear.name,
       metadata: {'reason': reason},
     );
+    if (_activeSchoolYearCache?.id == schoolYear.id) {
+      _activeSchoolYearCache = null;
+    }
+  }
+
+  void clearActiveSchoolYearCache() {
+    _activeSchoolYearCache = null;
   }
 
   Future<AttendanceLog> scanId({
@@ -91,7 +122,8 @@ class AttendanceService {
       );
     }
 
-    final person = await _findPerson(scannedId, schoolYear.id);
+    final online = await _queue.isOnline;
+    final person = await _findPerson(scannedId, schoolYear.id, online: online);
     if (person == null) {
       throw StateError('No active student or teacher found for ID $scannedId.');
     }
@@ -111,17 +143,15 @@ class AttendanceService {
       scannedBy: scanner.fullName,
       scannerUserId: scanner.id,
       deviceId: deviceId,
-      offline: !await _queue.isOnline,
-      syncStatus: await _queue.isOnline
-          ? SyncStatus.synced
-          : SyncStatus.pendingSync,
+      offline: !online,
+      syncStatus: online ? SyncStatus.synced : SyncStatus.pendingSync,
       timestamp: now,
       schoolYearId: schoolYear.id,
       schoolYear: schoolYear.name,
       activeTerm: schoolYear.activeTermName(now),
     );
 
-    if (!await _queue.isOnline) {
+    if (!online) {
       await _queue.enqueue(log);
       return log;
     }
@@ -191,6 +221,8 @@ class AttendanceService {
 
   Future<bool> _isDuplicate(AttendanceLog log) async {
     final query = await _firestore
+        .collection('school_years')
+        .doc(log.schoolYearId)
         .collection('attendance_logs')
         .where('duplicateKey', isEqualTo: log.duplicateKey)
         .limit(1)
@@ -199,11 +231,6 @@ class AttendanceService {
   }
 
   Future<void> _writeLog(AttendanceLog log) async {
-    await _firestore.collection('attendance_logs').doc(log.id).set({
-      ...log.toMap(),
-      'syncStatus': SyncStatus.synced.name,
-      'offline': log.offline,
-    });
     if (log.schoolYearId.isNotEmpty) {
       await _firestore
           .collection('school_years')
@@ -235,8 +262,7 @@ class AttendanceService {
     SystemSettings settings,
   ) {
     final threshold = _thresholdFor(type, person, settings, now);
-    if (type == AttendanceType.morningTimeIn ||
-        type == AttendanceType.afternoonTimeIn) {
+    if (type.isTimeIn) {
       if (now.isBefore(
         threshold.subtract(Duration(minutes: settings.earlyBeforeMinutes)),
       )) {
@@ -254,30 +280,53 @@ class AttendanceService {
     DateTime now,
   ) {
     final raw = person.role == PersonRole.teacher
-        ? (type == AttendanceType.morningTimeOut ||
-                  type == AttendanceType.afternoonTimeOut
-              ? person.assignedTimeOut
-              : person.assignedTimeIn)
-        : (type == AttendanceType.morningTimeOut ||
-                  type == AttendanceType.afternoonTimeOut
-              ? settings.studentTimeOut
-              : settings.studentTimeIn);
+        ? (type.isTimeOut ? person.assignedTimeOut : person.assignedTimeIn)
+        : (type.isTimeOut ? settings.studentTimeOut : settings.studentTimeIn);
     final parts = raw.split(':');
     final hour = int.tryParse(parts.first) ?? 7;
     final minute = parts.length > 1 ? int.tryParse(parts[1]) ?? 0 : 0;
     return DateTime(now.year, now.month, now.day, hour, minute);
   }
 
-  Future<_PersonMatch?> _findPerson(String id, String schoolYearId) async {
+  Future<_PersonMatch?> _findPerson(
+    String id,
+    String schoolYearId, {
+    required bool online,
+  }) async {
+    if (!online) {
+      final cached = await _queue.findCachedPerson(
+        schoolYearId: schoolYearId,
+        personId: id,
+      );
+      if (cached == null) return null;
+      return _PersonMatch(
+        fullName: cached['fullName'] as String? ?? '',
+        role: (cached['role'] as String? ?? 'student') == 'teacher'
+            ? PersonRole.teacher
+            : PersonRole.student,
+        section: cached['section'] as String? ?? '',
+        assignedTimeIn: cached['assignedTimeIn'] as String? ?? '07:00',
+        assignedTimeOut: cached['assignedTimeOut'] as String? ?? '17:00',
+      );
+    }
+
     final studentQuery = await _firestore
+        .collection('school_years')
+        .doc(schoolYearId)
         .collection('students')
         .where('lrn', isEqualTo: id)
-        .where('schoolYearId', isEqualTo: schoolYearId)
         .where('archived', isEqualTo: false)
         .limit(1)
         .get();
     if (studentQuery.docs.isNotEmpty) {
       final student = Student.fromDoc(studentQuery.docs.first);
+      await _queue.cachePerson(
+        schoolYearId: schoolYearId,
+        personId: id,
+        fullName: student.fullName,
+        role: PersonRole.student.name,
+        section: student.section,
+      );
       return _PersonMatch(
         fullName: student.fullName,
         role: PersonRole.student,
@@ -286,14 +335,24 @@ class AttendanceService {
     }
 
     final teacherQuery = await _firestore
+        .collection('school_years')
+        .doc(schoolYearId)
         .collection('teachers')
         .where('teacherId', isEqualTo: id)
-        .where('schoolYearId', isEqualTo: schoolYearId)
         .where('archived', isEqualTo: false)
         .limit(1)
         .get();
     if (teacherQuery.docs.isNotEmpty) {
       final teacher = Teacher.fromDoc(teacherQuery.docs.first);
+      await _queue.cachePerson(
+        schoolYearId: schoolYearId,
+        personId: id,
+        fullName: teacher.fullName,
+        role: PersonRole.teacher.name,
+        section: '',
+        assignedTimeIn: teacher.assignedTimeIn,
+        assignedTimeOut: teacher.assignedTimeOut,
+      );
       return _PersonMatch(
         fullName: teacher.fullName,
         role: PersonRole.teacher,

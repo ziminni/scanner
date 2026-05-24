@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../core/services/app_controller.dart';
-import '../../features/admin/view/admin_pages.dart';
-import '../../features/scanner/view/scanner_screen.dart';
+import '../../screens/scanner/scanner_screen.dart';
+import '../../screens/schooladmin/school_admin_pages.dart';
+import '../../screens/systemadmin/admin_pages.dart';
 import '../../models/enums.dart';
 
 class AppShell extends StatelessWidget {
@@ -85,13 +86,18 @@ class AppShell extends StatelessWidget {
   }
 
   Widget _pageFor(BuildContext context, String pageId) {
+    final role = AppScope.of(context).currentUser!.role;
     final page = switch (pageId) {
-      'dashboard' => const DashboardPage(),
+      'dashboard' => role == UserRole.systemAdministrator
+          ? const SystemAdminDashboardPage()
+          : const SchoolAdminDashboardPage(),
       'users' => const UserManagementPage(),
       'audit' => const AuditLogsPage(),
       'settings' => const SystemSettingsPage(),
       'database' => const DatabaseManagementPage(),
-      'archives' => const ArchiveManagementPage(),
+      'archives' => role == UserRole.systemAdministrator
+          ? const SystemArchiveManagementPage()
+          : const SchoolArchiveManagementPage(),
       'scannerUsers' => const ScannerUsersPage(),
       'schoolYears' => const SchoolYearPage(),
       'students' => const StudentsPage(),
@@ -102,7 +108,9 @@ class AppShell extends StatelessWidget {
       'earlyStudents' => const EarlyStudentsPage(),
       'reports' => const ReportsExportPage(),
       'scanner' => const ScannerScreen(),
-      _ => const DashboardPage(),
+      _ => role == UserRole.systemAdministrator
+          ? const SystemAdminDashboardPage()
+          : const SchoolAdminDashboardPage(),
     };
     if (_requiresActiveSchoolYear(pageId)) {
       return _ActiveSchoolYearGate(child: page);

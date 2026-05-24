@@ -39,25 +39,30 @@ enum PersonRole {
 }
 
 enum AttendanceType {
-  morningTimeIn,
-  morningTimeOut,
-  afternoonTimeIn,
-  afternoonTimeOut;
+  timeIn,
+  timeOut;
 
   String get label => switch (this) {
-    AttendanceType.morningTimeIn => 'Morning Time In',
-    AttendanceType.morningTimeOut => 'Morning Time Out',
-    AttendanceType.afternoonTimeIn => 'Afternoon Time In',
-    AttendanceType.afternoonTimeOut => 'Afternoon Time Out',
+    AttendanceType.timeIn => 'Time In',
+    AttendanceType.timeOut => 'Time Out',
   };
 
   String get key => name;
 
-  static AttendanceType fromKey(String? value) =>
-      AttendanceType.values.firstWhere(
-        (type) => type.key == value,
-        orElse: () => AttendanceType.morningTimeIn,
-      );
+  bool get isTimeIn => this == AttendanceType.timeIn;
+
+  bool get isTimeOut => this == AttendanceType.timeOut;
+
+  static const scannerTypes = [AttendanceType.timeIn, AttendanceType.timeOut];
+
+  static AttendanceType fromKey(String? value) {
+    return switch (value) {
+      'timeOut' ||
+      'morningTimeOut' ||
+      'afternoonTimeOut' => AttendanceType.timeOut,
+      _ => AttendanceType.timeIn,
+    };
+  }
 }
 
 enum AttendanceStatus {

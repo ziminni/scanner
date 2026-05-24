@@ -112,9 +112,12 @@ class SchoolYear {
   }
 
   factory SchoolYear.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
-    final data = doc.data() ?? {};
+    return SchoolYear.fromMap(doc.id, doc.data() ?? {});
+  }
+
+  factory SchoolYear.fromMap(String id, Map<String, dynamic> data) {
     return SchoolYear(
-      id: doc.id,
+      id: id,
       name: data['name'] as String? ?? '',
       isActive: data['isActive'] as bool? ?? false,
       archived: data['archived'] as bool? ?? false,

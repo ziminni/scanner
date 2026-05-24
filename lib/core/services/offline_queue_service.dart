@@ -8,6 +8,8 @@ import '../../models/models.dart';
 
 class OfflineQueueService {
   static const _queueKey = 'pending_attendance_logs';
+  static const _activeSchoolYearKey = 'cached_active_school_year';
+  static const _personCacheKey = 'cached_people';
 
   OfflineQueueService(this._connectivity);
 
@@ -48,6 +50,69 @@ class OfflineQueueService {
     await _save(pending);
   }
 
+  Future<void> cacheActiveSchoolYear(SchoolYear schoolYear) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _activeSchoolYearKey,
+      jsonEncode({'id': schoolYear.id, 'data': _schoolYearMap(schoolYear)}),
+    );
+  }
+
+  Future<SchoolYear?> loadCachedActiveSchoolYear() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_activeSchoolYearKey);
+    if (raw == null) return null;
+    final decoded = jsonDecode(raw) as Map<String, dynamic>;
+    return SchoolYear.fromMap(
+      decoded['id'] as String,
+      Map<String, dynamic>.from(decoded['data'] as Map),
+    );
+  }
+
+  Future<void> cachePerson({
+    required String schoolYearId,
+    required String personId,
+    required String fullName,
+    required String role,
+    required String section,
+    String assignedTimeIn = '07:00',
+    String assignedTimeOut = '17:00',
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final people = prefs.getStringList(_personCacheKey) ?? const [];
+    final key = '$schoolYearId-$personId';
+    final next =
+        people
+            .map((item) => jsonDecode(item) as Map<String, dynamic>)
+            .where((item) => item['key'] != key)
+            .toList()
+          ..add({
+            'key': key,
+            'schoolYearId': schoolYearId,
+            'personId': personId,
+            'fullName': fullName,
+            'role': role,
+            'section': section,
+            'assignedTimeIn': assignedTimeIn,
+            'assignedTimeOut': assignedTimeOut,
+          });
+    await prefs.setStringList(_personCacheKey, next.map(jsonEncode).toList());
+  }
+
+  Future<Map<String, dynamic>?> findCachedPerson({
+    required String schoolYearId,
+    required String personId,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = '$schoolYearId-$personId';
+    final people = prefs.getStringList(_personCacheKey) ?? const [];
+    for (final item in people) {
+      final decoded = jsonDecode(item) as Map<String, dynamic>;
+      if (decoded['key'] == key) return decoded;
+    }
+    return null;
+  }
+
   Future<void> remove(String id) async {
     final pending = await loadPendingLogs();
     pending.removeWhere((log) => log.id == id);
@@ -73,5 +138,15 @@ class OfflineQueueService {
     ...log.toMap(),
     'timestamp': log.timestamp.toIso8601String(),
     'syncStatus': 'pendingSync',
+  };
+
+  Map<String, dynamic> _schoolYearMap(SchoolYear schoolYear) => {
+    ...schoolYear.toMap(),
+    'term1Start': schoolYear.termStarts.elementAtOrNull(0)?.toIso8601String(),
+    'term1End': schoolYear.termEnds.elementAtOrNull(0)?.toIso8601String(),
+    'term2Start': schoolYear.termStarts.elementAtOrNull(1)?.toIso8601String(),
+    'term2End': schoolYear.termEnds.elementAtOrNull(1)?.toIso8601String(),
+    'term3Start': schoolYear.termStarts.elementAtOrNull(2)?.toIso8601String(),
+    'term3End': schoolYear.termEnds.elementAtOrNull(2)?.toIso8601String(),
   };
 }
