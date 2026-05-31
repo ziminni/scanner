@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/services/app_controller.dart';
-import '../../models/enums.dart';
+import '../../core/constants/enums.dart';
 import '../../shared/widgets/app_widgets.dart';
 import 'attendance_logs_page.dart';
 import '../systemadmin/audit_logs_page.dart';
@@ -13,7 +13,6 @@ class SchoolAdminDashboardPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final app = AppScope.of(context);
     final user = app.currentUser!;
-    final firestore = app.firestore;
     final systemAdmin = user.role == UserRole.systemAdministrator;
 
     return ListView(
@@ -33,7 +32,7 @@ class SchoolAdminDashboardPage extends StatelessWidget {
           children: [
             if (systemAdmin)
               FirestoreCount(
-                query: firestore.collection('users'),
+                query: app.repository.usersQuery(),
                 builder: (value) => MetricCard(
                   label: 'Total users',
                   value: value,
@@ -59,10 +58,7 @@ class SchoolAdminDashboardPage extends StatelessWidget {
               ),
             ),
             FirestoreCount(
-              query: firestore
-                  .collection('users')
-                  .where('role', isEqualTo: UserRole.staffScanner.key)
-                  .where('status', isEqualTo: 'active'),
+              query: app.repository.activeStaffScannerUsersQuery(),
               builder: (value) => MetricCard(
                 label: 'Active scanner users',
                 value: value,

@@ -1,9 +1,8 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 
-import '../core/services/app_controller.dart';
-import '../models/enums.dart';
-import '../models/models.dart';
+import '../../../core/services/app_controller.dart';
+import '../../../core/constants/enums.dart';
+import '../../../models/models.dart';
 import 'base_viewmodel.dart';
 
 enum EarlyLeaderboardPeriod {
@@ -113,13 +112,11 @@ class EarlyStudentsViewModel extends BaseViewModel {
     DateTime end,
     String schoolYearId,
   ) async {
-    final query = await _app.firestore
-        .collection('school_years')
-        .doc(schoolYearId)
-        .collection('attendance_logs')
-        .where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
-        .where('timestamp', isLessThan: Timestamp.fromDate(end))
-        .get();
+    final query = await _app.repository.attendanceLogsForRange(
+      schoolYearId: schoolYearId,
+      start: start,
+      end: end,
+    );
     return query.docs.map(AttendanceLog.fromDoc).toList();
   }
 
