@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -5,6 +7,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 
 import '../../models/models.dart';
+import '../repositories/firebase_repository.dart';
 import 'admin_service.dart';
 import 'attendance_service.dart';
 import 'audit_service.dart';
@@ -18,6 +21,7 @@ class AppController extends ChangeNotifier {
     auth = AuthService(firebaseAuth, firestore, audit);
     attendance = AttendanceService(firestore, offlineQueue, audit);
     admin = AdminService(firestore, firebaseAuth, storage, audit);
+    repository = FirebaseRepository(firestore, audit);
   }
 
   final FirebaseFirestore firestore = FirebaseFirestore.instance;
@@ -29,10 +33,10 @@ class AppController extends ChangeNotifier {
   late final AuthService auth;
   late final AttendanceService attendance;
   late final AdminService admin;
+  late final FirebaseRepository repository;
 
   AppUser? currentUser;
   bool loading = true;
-  String currentPage = 'dashboard';
   String? authError;
 
   Future<void> initialize() async {
@@ -46,9 +50,6 @@ class AppController extends ChangeNotifier {
     loading = true;
     notifyListeners();
     currentUser = await auth.loadCurrentUser();
-    if (currentUser != null && !auth.canAccess(currentUser!, currentPage)) {
-      currentPage = defaultPageFor(currentUser!);
-    }
     loading = false;
     notifyListeners();
   }
@@ -59,7 +60,6 @@ class AppController extends ChangeNotifier {
     notifyListeners();
     try {
       currentUser = await auth.login(email, password);
-      currentPage = defaultPageFor(currentUser!);
     } catch (error) {
       authError = error.toString();
       rethrow;
@@ -72,26 +72,13 @@ class AppController extends ChangeNotifier {
   Future<void> logout() async {
     await auth.logout();
     currentUser = null;
-    currentPage = 'dashboard';
     notifyListeners();
   }
 
-  void go(String pageId) {
-    final user = currentUser;
-    if (user == null) return;
-    if (!auth.canAccess(user, pageId)) {
-      logout();
-      return;
-    }
-    currentPage = pageId;
-    notifyListeners();
-  }
-
-  String defaultPageFor(AppUser user) {
-    return switch (user.role.key) {
-      'staff_scanner' => 'scanner',
-      _ => 'dashboard',
-    };
+  void logoutForUnauthorizedAccess() {
+    currentUser = null;
+    scheduleMicrotask(notifyListeners);
+    unawaited(auth.logout(reason: 'unauthorized_route'));
   }
 }
 

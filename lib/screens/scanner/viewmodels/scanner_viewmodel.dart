@@ -1,6 +1,6 @@
-import '../core/services/app_controller.dart';
-import '../models/enums.dart';
-import '../models/models.dart';
+import '../../../core/services/app_controller.dart';
+import '../../../core/constants/enums.dart';
+import '../../../models/models.dart';
 import 'base_viewmodel.dart';
 
 class ScannerViewModel extends BaseViewModel {

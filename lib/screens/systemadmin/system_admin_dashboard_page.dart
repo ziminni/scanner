@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/services/app_controller.dart';
-import '../../models/enums.dart';
+import '../../core/constants/enums.dart';
 import '../../shared/widgets/app_widgets.dart';
 import 'audit_logs_page.dart';
 import '../schooladmin/attendance_logs_page.dart';
@@ -13,7 +13,6 @@ class SystemAdminDashboardPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final app = AppScope.of(context);
     final user = app.currentUser!;
-    final firestore = app.firestore;
     final systemAdmin = user.role == UserRole.systemAdministrator;
 
     return ListView(
@@ -33,7 +32,7 @@ class SystemAdminDashboardPage extends StatelessWidget {
           children: [
             if (systemAdmin)
               FirestoreCount(
-                query: firestore.collection('users'),
+                query: app.repository.usersQuery(),
                 builder: (value) => MetricCard(
                   label: 'Total users',
                   value: value,
@@ -41,9 +40,7 @@ class SystemAdminDashboardPage extends StatelessWidget {
                 ),
               ),
             FirestoreCount(
-              query: firestore
-                  .collectionGroup('students')
-                  .where('archived', isEqualTo: false),
+              query: app.repository.activeCollectionGroupQuery('students'),
               builder: (value) => MetricCard(
                 label: 'Total students',
                 value: value,
@@ -51,9 +48,7 @@ class SystemAdminDashboardPage extends StatelessWidget {
               ),
             ),
             FirestoreCount(
-              query: firestore
-                  .collectionGroup('teachers')
-                  .where('archived', isEqualTo: false),
+              query: app.repository.activeCollectionGroupQuery('teachers'),
               builder: (value) => MetricCard(
                 label: 'Total teachers',
                 value: value,
@@ -61,10 +56,7 @@ class SystemAdminDashboardPage extends StatelessWidget {
               ),
             ),
             FirestoreCount(
-              query: firestore
-                  .collection('users')
-                  .where('role', isEqualTo: UserRole.staffScanner.key)
-                  .where('status', isEqualTo: 'active'),
+              query: app.repository.activeStaffScannerUsersQuery(),
               builder: (value) => MetricCard(
                 label: 'Active scanner users',
                 value: value,
@@ -73,12 +65,9 @@ class SystemAdminDashboardPage extends StatelessWidget {
             ),
             if (!systemAdmin)
               FirestoreCount(
-                query: firestore
-                    .collectionGroup('attendance_logs')
-                    .where(
-                      'attendanceStatus',
-                      isEqualTo: AttendanceStatus.late.name,
-                    ),
+                query: app.repository.attendanceStatusCollectionGroupQuery(
+                  AttendanceStatus.late.name,
+                ),
                 builder: (value) => MetricCard(
                   label: 'Late count',
                   value: value,
@@ -87,12 +76,9 @@ class SystemAdminDashboardPage extends StatelessWidget {
               ),
             if (!systemAdmin)
               FirestoreCount(
-                query: firestore
-                    .collectionGroup('attendance_logs')
-                    .where(
-                      'attendanceStatus',
-                      isEqualTo: AttendanceStatus.absent.name,
-                    ),
+                query: app.repository.attendanceStatusCollectionGroupQuery(
+                  AttendanceStatus.absent.name,
+                ),
                 builder: (value) => MetricCard(
                   label: 'Absent count',
                   value: value,

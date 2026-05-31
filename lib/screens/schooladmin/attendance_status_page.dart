@@ -4,7 +4,9 @@ import '../../core/services/app_controller.dart';
 import '../../shared/widgets/admin_widgets.dart';
 import '../../shared/widgets/app_widgets.dart';
 import '../../shared/widgets/loading_widget.dart';
-import '../../viewmodels/attendance_status_viewmodel.dart';
+import 'viewmodels/attendance_status_viewmodel.dart';
+
+part 'widgets/attendance_status_table.dart';
 
 class AttendanceStatusPage extends StatefulWidget {
   const AttendanceStatusPage({super.key});
@@ -125,48 +127,6 @@ class _AttendanceStatusPageState extends State<AttendanceStatusPage> {
           ),
         );
       },
-    );
-  }
-}
-
-class _AttendanceStatusTable extends StatelessWidget {
-  const _AttendanceStatusTable({required this.entries});
-
-  final List<AttendanceStatusEntry> entries;
-
-  @override
-  Widget build(BuildContext context) {
-    return DataSurface(
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: DataTable(
-          columns: const [
-            DataColumn(label: Text('ID')),
-            DataColumn(label: Text('Name')),
-            DataColumn(label: Text('Role')),
-            DataColumn(label: Text('Section')),
-            DataColumn(label: Text('Status')),
-            DataColumn(label: Text('Time In')),
-            DataColumn(label: Text('Time Out')),
-            DataColumn(label: Text('Details')),
-          ],
-          rows: [
-            for (final entry in entries)
-              DataRow(
-                cells: [
-                  DataCell(Text(entry.personId)),
-                  DataCell(Text(entry.fullName)),
-                  DataCell(Text(entry.role.label)),
-                  DataCell(Text(entry.section.isEmpty ? '-' : entry.section)),
-                  DataCell(Text(entry.status.label)),
-                  DataCell(Text(entry.timeIn)),
-                  DataCell(Text(entry.timeOut)),
-                  DataCell(Text(entry.detail)),
-                ],
-              ),
-          ],
-        ),
-      ),
     );
   }
 }

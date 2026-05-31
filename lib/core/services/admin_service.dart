@@ -7,7 +7,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:pdf/widgets.dart' as pw;
 
-import '../../models/enums.dart';
+import '../constants/enums.dart';
 import '../../models/models.dart';
 import 'audit_service.dart';
 import 'firebase_options.dart';
