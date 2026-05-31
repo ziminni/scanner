@@ -4,7 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 
-import '../../models/enums.dart';
+import '../constants/enums.dart';
 import '../../models/models.dart';
 import 'audit_service.dart';
 import 'offline_queue_service.dart';

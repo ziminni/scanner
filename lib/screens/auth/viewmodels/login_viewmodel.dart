@@ -1,4 +1,4 @@
-import '../core/services/app_controller.dart';
+import '../../../core/services/app_controller.dart';
 import 'base_viewmodel.dart';
 
 class LoginViewModel extends BaseViewModel {

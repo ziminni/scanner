@@ -112,7 +112,7 @@ class ActiveSchoolYearCount extends StatelessWidget {
       builder: (context, snapshot) {
         final schoolYear = snapshot.data;
         if (schoolYear == null) return builder('0');
-        Query<Map<String, dynamic>> query = app.firestore
+        Query<Map<String, dynamic>> query = app.repository
             .collectionGroup(collection)
             .where('schoolYearId', isEqualTo: schoolYear.id);
         for (final entry in filters.entries) {

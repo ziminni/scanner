@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
-import '../core/services/app_controller.dart';
+import '../../../core/services/app_controller.dart';
 import 'base_viewmodel.dart';
 
 class CrudViewModel extends BaseViewModel {
@@ -61,8 +61,10 @@ class CrudViewModel extends BaseViewModel {
   }
 
   Future<void> addRecord() async {
-    final schoolYear = await _app.attendance.activeSchoolYear();
-    if (schoolYear == null) {
+    final schoolYear = collection == 'sections'
+        ? null
+        : await _app.attendance.activeSchoolYear();
+    if (collection != 'sections' && schoolYear == null) {
       setError('Create an active school year before adding records.');
       return;
     }
@@ -86,17 +88,23 @@ class CrudViewModel extends BaseViewModel {
           assignedTimeOut ?? const TimeOfDay(hour: 17, minute: 0),
         ),
       if (fields.contains('status')) 'status': 'Active',
-      'schoolYearId': schoolYear.id,
-      'schoolYear': schoolYear.name,
+      if (schoolYear != null) ...{
+        'schoolYearId': schoolYear.id,
+        'schoolYear': schoolYear.name,
+      },
       'archived': false,
       'createdAt': FieldValue.serverTimestamp(),
     };
 
-    await _app.firestore
-        .collection('school_years')
-        .doc(schoolYear.id)
-        .collection(collection)
-        .add(data);
+    if (schoolYear == null) {
+      await _app.repository.addGlobalRecord(collection: collection, data: data);
+    } else {
+      await _app.repository.addSchoolYearRecord(
+        schoolYear: schoolYear,
+        collection: collection,
+        data: data,
+      );
+    }
 
     await _app.audit.record(
       action: '${collection}_created',

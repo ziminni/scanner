@@ -11,11 +11,19 @@ class CollectionTable extends StatelessWidget {
     required this.collection,
     required this.columns,
     this.schoolYearScoped = false,
+    this.onEdit,
   });
 
   final String collection;
   final List<String> columns;
   final bool schoolYearScoped;
+  final void Function(
+    BuildContext context,
+    String docId,
+    Map<String, dynamic> data,
+    String? schoolYearId,
+  )?
+  onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -33,17 +41,15 @@ class CollectionTable extends StatelessWidget {
           return _CollectionTableBody(
             collection: collection,
             columns: columns,
-            stream: app.firestore
-                .collection('school_years')
-                .doc(schoolYear.id)
-                .collection(collection)
+            stream: app.repository
+                .schoolYearCollection(schoolYear.id, collection)
                 .limit(200)
                 .snapshots(),
+            schoolYearId: schoolYear.id,
+            onEdit: onEdit,
             onArchive: (docId) async {
-              await app.firestore
-                  .collection('school_years')
-                  .doc(schoolYear.id)
-                  .collection(collection)
+              await app.repository
+                  .schoolYearCollection(schoolYear.id, collection)
                   .doc(docId)
                   .set({
                     'archived': true,
@@ -63,7 +69,8 @@ class CollectionTable extends StatelessWidget {
     return _CollectionTableBody(
       collection: collection,
       columns: columns,
-      stream: app.firestore.collection(collection).limit(200).snapshots(),
+      stream: app.repository.rootCollection(collection).limit(200).snapshots(),
+      onEdit: onEdit,
       onArchive: (docId) =>
           app.admin.archiveRecord(collection, docId, app.currentUser!),
     );
@@ -76,12 +83,22 @@ class _CollectionTableBody extends StatelessWidget {
     required this.columns,
     required this.stream,
     required this.onArchive,
+    this.schoolYearId,
+    this.onEdit,
   });
 
   final String collection;
   final List<String> columns;
   final Stream<QuerySnapshot<Map<String, dynamic>>> stream;
   final Future<void> Function(String docId) onArchive;
+  final String? schoolYearId;
+  final void Function(
+    BuildContext context,
+    String docId,
+    Map<String, dynamic> data,
+    String? schoolYearId,
+  )?
+  onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -108,10 +125,26 @@ class _CollectionTableBody extends StatelessWidget {
                       for (final column in columns)
                         DataCell(Text(adminFormatValue(doc.data()[column]))),
                       DataCell(
-                        IconButton(
-                          tooltip: 'Archive',
-                          icon: const Icon(Icons.archive_outlined),
-                          onPressed: () => onArchive(doc.id),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              tooltip: 'Archive',
+                              icon: const Icon(Icons.archive_outlined),
+                              onPressed: () => onArchive(doc.id),
+                            ),
+                            if (onEdit != null)
+                              IconButton(
+                                tooltip: 'Edit',
+                                icon: const Icon(Icons.edit_outlined),
+                                onPressed: () => onEdit!(
+                                  context,
+                                  doc.id,
+                                  doc.data(),
+                                  schoolYearId,
+                                ),
+                              ),
+                          ],
                         ),
                       ),
                     ],
