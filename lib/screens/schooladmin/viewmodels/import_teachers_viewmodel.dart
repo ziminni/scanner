@@ -1,15 +1,27 @@
 import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:excel/excel.dart';
 import 'package:file_picker/file_picker.dart' as fp;
 import 'package:intl/intl.dart';
+import 'package:spreadsheet_decoder/spreadsheet_decoder.dart';
 
 import '../../../core/services/app_controller.dart';
 import 'base_viewmodel.dart';
 
 class ImportTeachersViewModel extends BaseViewModel {
   ImportTeachersViewModel(this._app);
+
+  static const _expectedHeaders = [
+    'teacherid',
+    'lastname',
+    'firstname',
+    'middlename',
+    'birthdate',
+    'address',
+    'contactnumber',
+    'timein',
+    'timeout',
+  ];
 
   final AppController _app;
   Uint8List? _bytes;
@@ -26,8 +38,14 @@ class ImportTeachersViewModel extends BaseViewModel {
     );
     final file = result?.files.single;
     if (file == null) return;
+    if (!file.name.toLowerCase().endsWith('.xlsx')) {
+      setError('Please upload an Excel file with the .xlsx extension.');
+      return;
+    }
     if (file.bytes == null) {
-      setError('Could not read the selected file.');
+      setError(
+        'We could not read that file. Please choose another .xlsx file.',
+      );
       return;
     }
     _bytes = file.bytes;
@@ -40,7 +58,7 @@ class ImportTeachersViewModel extends BaseViewModel {
   Future<bool> importTeachers() async {
     final bytes = _bytes;
     if (bytes == null) {
-      setError('Select a spreadsheet first.');
+      setError('Please choose a .xlsx spreadsheet first.');
       return false;
     }
 
@@ -54,7 +72,42 @@ class ImportTeachersViewModel extends BaseViewModel {
 
       final records = _parseRecords(bytes, schoolYear.id, schoolYear.name);
       if (records.isEmpty) {
-        setError('No valid teacher rows found.');
+        setError(
+          'No teacher rows were found. Check that your file has data below the header row.',
+        );
+        return false;
+      }
+
+      final duplicateTeacherIds = _duplicateTeacherIds(records);
+      if (duplicateTeacherIds.isNotEmpty) {
+        setError(
+          'Some Teacher IDs appear more than once in the spreadsheet: ${duplicateTeacherIds.take(5).join(', ')}.',
+        );
+        return false;
+      }
+
+      final existingTeacherIds = await _app.repository.schoolYearFieldValues(
+        schoolYearId: schoolYear.id,
+        collection: 'teachers',
+        field: 'teacherId',
+      );
+      final alreadyExisting =
+          records
+              .map((record) => record['teacherId']?.toString().trim() ?? '')
+              .where((id) => existingTeacherIds.contains(id.toLowerCase()))
+              .toSet()
+              .toList()
+            ..sort();
+      if (alreadyExisting.isNotEmpty) {
+        setError(
+          'Teacher ID already exists: ${alreadyExisting.take(5).join(', ')}.',
+        );
+        return false;
+      }
+
+      final user = _app.currentUser;
+      if (user == null) {
+        setError('Your session expired. Please log in again.');
         return false;
       }
 
@@ -65,16 +118,19 @@ class ImportTeachersViewModel extends BaseViewModel {
       );
       await _app.audit.record(
         action: 'teachers_imported',
-        actorId: _app.currentUser!.id,
-        actorName: _app.currentUser!.fullName,
+        actorId: user.id,
+        actorName: user.fullName,
         target: fileName ?? 'Teacher spreadsheet',
         metadata: {'count': records.length, 'schoolYear': schoolYear.name},
       );
       importedCount = records.length;
       setError(null);
       return true;
+    } on FormatException catch (error) {
+      setError(error.message);
+      return false;
     } catch (error) {
-      setError(error.toString());
+      setError(_friendlyError(error));
       return false;
     } finally {
       setBusy(false);
@@ -86,11 +142,18 @@ class ImportTeachersViewModel extends BaseViewModel {
     String schoolYearId,
     String schoolYearName,
   ) {
-    final excel = Excel.decodeBytes(bytes);
-    final sheetName = excel.tables.keys.firstOrNull;
-    if (sheetName == null) return [];
-    final rows = excel.tables[sheetName]?.rows ?? [];
-    if (rows.length <= 1) return [];
+    final spreadsheet = SpreadsheetDecoder.decodeBytes(bytes, update: false);
+    final sheetName = spreadsheet.tables.keys.firstOrNull;
+    if (sheetName == null) {
+      throw const FormatException('No worksheet was found in the spreadsheet.');
+    }
+    final rows = spreadsheet.tables[sheetName]?.rows ?? [];
+    if (rows.length <= 1) {
+      throw const FormatException(
+        'The spreadsheet needs a header row and at least one teacher row.',
+      );
+    }
+    _validateHeaders(rows.first);
 
     final records = <Map<String, dynamic>>[];
     for (var index = 1; index < rows.length; index++) {
@@ -98,7 +161,13 @@ class ImportTeachersViewModel extends BaseViewModel {
       final teacherId = _text(row, 0);
       final lastName = _text(row, 1);
       final firstName = _text(row, 2);
-      if (teacherId.isEmpty || lastName.isEmpty || firstName.isEmpty) continue;
+      final rowNumber = index + 1;
+      if (_isBlankRow(row)) continue;
+      if (teacherId.isEmpty || lastName.isEmpty || firstName.isEmpty) {
+        throw FormatException(
+          'Row $rowNumber must include Teacher ID, last name, and first name.',
+        );
+      }
 
       records.add({
         'teacherId': teacherId,
@@ -120,28 +189,71 @@ class ImportTeachersViewModel extends BaseViewModel {
     return records;
   }
 
-  String _text(List<Data?> row, int index) {
-    if (index >= row.length) return '';
-    final value = row[index]?.value;
-    if (value == null) return '';
-    return switch (value) {
-      TextCellValue(:final value) => (value.text ?? '').trim(),
-      DateCellValue() ||
-      DateTimeCellValue() ||
-      TimeCellValue() => value.toString().trim(),
-      _ => value.toString().trim(),
+  void _validateHeaders(List<dynamic> headerRow) {
+    final actual = [
+      for (var index = 0; index < _expectedHeaders.length; index++)
+        _normalizeHeader(_text(headerRow, index)),
+    ];
+    for (var index = 0; index < _expectedHeaders.length; index++) {
+      if (actual[index] != _expectedHeaders[index]) {
+        throw FormatException(
+          'Column ${index + 1} should be ${_displayHeader(_expectedHeaders[index])}. Please check the header row.',
+        );
+      }
+    }
+  }
+
+  List<String> _duplicateTeacherIds(List<Map<String, dynamic>> records) {
+    final seen = <String>{};
+    final duplicates = <String>{};
+    for (final record in records) {
+      final teacherId = record['teacherId']?.toString().trim() ?? '';
+      final key = teacherId.toLowerCase();
+      if (key.isEmpty) continue;
+      if (!seen.add(key)) duplicates.add(teacherId);
+    }
+    return duplicates.toList()..sort();
+  }
+
+  bool _isBlankRow(List<dynamic> row) {
+    return row.every((cell) {
+      if (cell == null) return true;
+      return cell.toString().trim().isEmpty;
+    });
+  }
+
+  String _normalizeHeader(String value) {
+    return value.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+  }
+
+  String _displayHeader(String normalized) {
+    return switch (normalized) {
+      'teacherid' => 'Teacher ID',
+      'lastname' => 'Last name',
+      'firstname' => 'First name',
+      'middlename' => 'Middle name',
+      'birthdate' => 'Birthdate',
+      'address' => 'Address',
+      'contactnumber' => 'Contact number',
+      'timein' => 'Time in',
+      'timeout' => 'Time out',
+      _ => normalized,
     };
   }
 
-  Timestamp? _date(List<Data?> row, int index) {
+  String _text(List<dynamic> row, int index) {
+    if (index >= row.length) return '';
+    final value = row[index];
+    if (value == null) return '';
+    return value.toString().trim();
+  }
+
+  Timestamp? _date(List<dynamic> row, int index) {
     if (index >= row.length) return null;
-    final value = row[index]?.value;
-    final date = switch (value) {
-      DateCellValue() => value.asDateTimeLocal(),
-      DateTimeCellValue() => value.asDateTimeLocal(),
-      TextCellValue(:final value) => _parseDateText(value.text ?? ''),
-      _ => _parseDateText(value?.toString() ?? ''),
-    };
+    final value = row[index];
+    final date = value is DateTime
+        ? value
+        : _parseDateText(value?.toString() ?? '');
     return date == null ? null : Timestamp.fromDate(date);
   }
 
@@ -158,16 +270,15 @@ class ImportTeachersViewModel extends BaseViewModel {
     return null;
   }
 
-  String _time(List<Data?> row, int index) {
+  String _time(List<dynamic> row, int index) {
     if (index >= row.length) return '';
-    final value = row[index]?.value;
-    final parsed = switch (value) {
-      TimeCellValue() => _formatTime(value.hour, value.minute),
-      DateTimeCellValue() => _formatTime(value.hour, value.minute),
-      TextCellValue(:final value) => _parseTimeText(value.text ?? ''),
-      _ => _parseTimeText(value?.toString() ?? ''),
-    };
-    return parsed;
+    final value = row[index];
+    if (value is DateTime) return _formatTime(value.hour, value.minute);
+    if (value is num) {
+      final totalMinutes = (value * 24 * 60).round();
+      return _formatTime((totalMinutes ~/ 60) % 24, totalMinutes % 60);
+    }
+    return _parseTimeText(value?.toString() ?? '');
   }
 
   String _parseTimeText(String raw) {
@@ -184,5 +295,19 @@ class ImportTeachersViewModel extends BaseViewModel {
 
   String _formatTime(int hour, int minute) {
     return '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}';
+  }
+
+  String _friendlyError(Object error) {
+    final message = error.toString();
+    if (message.contains('Unexpected null value')) {
+      return 'We could not read the spreadsheet format. Please make sure it is a valid .xlsx file and try again.';
+    }
+    if (message.contains('Zip')) {
+      return 'The selected file does not look like a valid .xlsx spreadsheet.';
+    }
+    if (message.contains('permission-denied')) {
+      return 'You do not have permission to import teachers.';
+    }
+    return 'Import failed. Please check the spreadsheet and try again.';
   }
 }
