@@ -1,7 +1,9 @@
 part of '../sections_page.dart';
 
 class _SectionsByGrade extends StatelessWidget {
-  const _SectionsByGrade();
+  const _SectionsByGrade({required this.search});
+
+  final String search;
 
   @override
   Widget build(BuildContext context) {
@@ -14,9 +16,21 @@ class _SectionsByGrade extends StatelessWidget {
           return const EmptyState(title: 'No sections records yet');
         }
 
+        final query = search.trim().toLowerCase();
+        final filteredDocs = docs.where((doc) {
+          if (query.isEmpty) return true;
+          final data = doc.data();
+          return '${data['name']} ${data['gradeLevel']} ${data['adviser']}'
+              .toLowerCase()
+              .contains(query);
+        }).toList();
+        if (filteredDocs.isEmpty) {
+          return const EmptyState(title: 'No sections found');
+        }
+
         final grouped =
             <String, List<QueryDocumentSnapshot<Map<String, dynamic>>>>{};
-        for (final doc in docs) {
+        for (final doc in filteredDocs) {
           final grade = (doc.data()['gradeLevel'] as String? ?? '').trim();
           grouped
               .putIfAbsent(grade.isEmpty ? 'No grade level' : grade, () => [])
@@ -28,7 +42,10 @@ class _SectionsByGrade extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             for (final gradeLevel in gradeLevels) ...[
-              Text(gradeLevel, style: Theme.of(context).textTheme.titleMedium),
+              Text(
+                _gradeLabel(gradeLevel),
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 12,
@@ -74,6 +91,13 @@ class _SectionsByGrade extends StatelessWidget {
     if (aNumber != null) return -1;
     if (bNumber != null) return 1;
     return a.compareTo(b);
+  }
+
+  String _gradeLabel(String gradeLevel) {
+    final value = gradeLevel.trim();
+    if (value.isEmpty || value == 'No grade level') return value;
+    if (value.toLowerCase().startsWith('grade')) return value;
+    return 'Grade $value';
   }
 
   int _sectionSort(
