@@ -11,8 +11,21 @@ part 'widgets/add_student_dialog.dart';
 part 'widgets/import_students_dialog.dart';
 part 'widgets/edit_student_dialog.dart';
 
-class StudentsPage extends StatelessWidget {
+class StudentsPage extends StatefulWidget {
   const StudentsPage({super.key});
+
+  @override
+  State<StudentsPage> createState() => _StudentsPageState();
+}
+
+class _StudentsPageState extends State<StudentsPage> {
+  final _search = TextEditingController();
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -36,11 +49,29 @@ class StudentsPage extends StatelessWidget {
           ),
         ),
       ],
-      child: const CollectionTable(
-        collection: 'students',
-        columns: studentTableFields,
-        schoolYearScoped: true,
-        onEdit: _openEditStudentDialog,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 380,
+            child: TextField(
+              controller: _search,
+              decoration: const InputDecoration(
+                prefixIcon: Icon(Icons.search),
+                labelText: 'Search student name, LRN, section',
+              ),
+              onChanged: (_) => setState(() {}),
+            ),
+          ),
+          const SizedBox(height: 12),
+          CollectionTable(
+            collection: 'students',
+            columns: studentTableFields,
+            schoolYearScoped: true,
+            search: _search.text,
+            onEdit: _openEditStudentDialog,
+          ),
+        ],
       ),
     );
   }

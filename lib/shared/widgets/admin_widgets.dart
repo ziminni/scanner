@@ -11,12 +11,14 @@ class CollectionTable extends StatelessWidget {
     required this.collection,
     required this.columns,
     this.schoolYearScoped = false,
+    this.search = '',
     this.onEdit,
   });
 
   final String collection;
   final List<String> columns;
   final bool schoolYearScoped;
+  final String search;
   final void Function(
     BuildContext context,
     String docId,
@@ -46,6 +48,7 @@ class CollectionTable extends StatelessWidget {
                 .limit(200)
                 .snapshots(),
             schoolYearId: schoolYear.id,
+            search: search,
             onEdit: onEdit,
             onArchive: (docId) async {
               await app.repository
@@ -70,6 +73,7 @@ class CollectionTable extends StatelessWidget {
       collection: collection,
       columns: columns,
       stream: app.repository.rootCollection(collection).limit(200).snapshots(),
+      search: search,
       onEdit: onEdit,
       onArchive: (docId) =>
           app.admin.archiveRecord(collection, docId, app.currentUser!),
@@ -83,6 +87,7 @@ class _CollectionTableBody extends StatelessWidget {
     required this.columns,
     required this.stream,
     required this.onArchive,
+    this.search = '',
     this.schoolYearId,
     this.onEdit,
   });
@@ -91,6 +96,7 @@ class _CollectionTableBody extends StatelessWidget {
   final List<String> columns;
   final Stream<QuerySnapshot<Map<String, dynamic>>> stream;
   final Future<void> Function(String docId) onArchive;
+  final String search;
   final String? schoolYearId;
   final void Function(
     BuildContext context,
@@ -105,7 +111,16 @@ class _CollectionTableBody extends StatelessWidget {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: stream,
       builder: (context, snapshot) {
-        final docs = snapshot.data?.docs ?? [];
+        final query = search.trim().toLowerCase();
+        final docs = (snapshot.data?.docs ?? []).where((doc) {
+          if (query.isEmpty) return true;
+          final data = doc.data();
+          return columns
+              .map((column) => adminFormatValue(data[column]))
+              .join(' ')
+              .toLowerCase()
+              .contains(query);
+        }).toList();
         if (docs.isEmpty) {
           return EmptyState(title: 'No $collection records yet');
         }
