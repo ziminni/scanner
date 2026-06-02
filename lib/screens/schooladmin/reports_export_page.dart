@@ -20,12 +20,10 @@ class ReportsExportPage extends StatelessWidget {
           onPressed: () async {
             final schoolYear = await app.attendance.activeSchoolYear();
             if (schoolYear == null) return;
-            final docs = await app.firestore
-                .collection('school_years')
-                .doc(schoolYear.id)
-                .collection('attendance_logs')
-                .limit(500)
-                .get();
+            final docs = await app.repository.attendanceLogsLimit(
+              schoolYearId: schoolYear.id,
+              limit: 500,
+            );
             await app.admin.exportLogsExcel(
               docs.docs.map(AttendanceLog.fromDoc).toList(),
             );
@@ -42,12 +40,10 @@ class ReportsExportPage extends StatelessWidget {
           onPressed: () async {
             final schoolYear = await app.attendance.activeSchoolYear();
             if (schoolYear == null) return;
-            final docs = await app.firestore
-                .collection('school_years')
-                .doc(schoolYear.id)
-                .collection('attendance_logs')
-                .limit(500)
-                .get();
+            final docs = await app.repository.attendanceLogsLimit(
+              schoolYearId: schoolYear.id,
+              limit: 500,
+            );
             await app.admin.exportLogsPdf(
               docs.docs.map(AttendanceLog.fromDoc).toList(),
             );

@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-import '../../models/enums.dart';
+import '../constants/enums.dart';
 import '../../models/models.dart';
 import 'audit_service.dart';
 

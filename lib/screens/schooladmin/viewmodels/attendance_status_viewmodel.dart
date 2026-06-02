@@ -1,8 +1,8 @@
 import 'package:intl/intl.dart';
 
-import '../core/services/app_controller.dart';
-import '../models/enums.dart';
-import '../models/models.dart';
+import '../../../core/services/app_controller.dart';
+import '../../../core/constants/enums.dart';
+import '../../../models/models.dart';
 import 'base_viewmodel.dart';
 
 enum AttendanceStatusFilter {
@@ -96,27 +96,12 @@ class AttendanceStatusViewModel extends BaseViewModel {
         return;
       }
 
-      final studentsQuery = await _app.firestore
-          .collection('school_years')
-          .doc(schoolYear.id)
-          .collection('students')
-          .where('archived', isEqualTo: false)
-          .get();
-      final teachersQuery = await _app.firestore
-          .collection('school_years')
-          .doc(schoolYear.id)
-          .collection('teachers')
-          .where('archived', isEqualTo: false)
-          .get();
-      final logsQuery = await _app.firestore
-          .collection('school_years')
-          .doc(schoolYear.id)
-          .collection('attendance_logs')
-          .where(
-            'dateKey',
-            isEqualTo: DateFormat('yyyy-MM-dd').format(selectedDate),
-          )
-          .get();
+      final studentsQuery = await _app.repository.activeStudents(schoolYear.id);
+      final teachersQuery = await _app.repository.activeTeachers(schoolYear.id);
+      final logsQuery = await _app.repository.attendanceLogsForDate(
+        schoolYearId: schoolYear.id,
+        dateKey: DateFormat('yyyy-MM-dd').format(selectedDate),
+      );
 
       final people = [
         for (final doc in studentsQuery.docs)
