@@ -51,7 +51,12 @@ class AttendanceLogsTable extends StatelessWidget {
                       DataCell(Text(log.section)),
                       DataCell(Text('${log.dateKey} ${log.timeText}')),
                       DataCell(Text(log.attendanceType.label)),
-                      DataCell(Text(log.attendanceStatus.label)),
+                      DataCell(StatusBadge(
+                        label: log.attendanceStatus.label,
+                        type: log.attendanceStatus == AttendanceStatus.late
+                            ? 'late'
+                            : 'active',
+                      )),
                       DataCell(Text(log.scannedBy)),
                       DataCell(Text(log.syncStatus.label)),
                     ],

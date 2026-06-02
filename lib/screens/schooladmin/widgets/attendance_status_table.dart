@@ -29,7 +29,7 @@ class _AttendanceStatusTable extends StatelessWidget {
                   DataCell(Text(entry.fullName)),
                   DataCell(Text(entry.role.label)),
                   DataCell(Text(entry.section.isEmpty ? '-' : entry.section)),
-                  DataCell(Text(entry.status.label)),
+                  DataCell(StatusBadge(label: entry.status.label, type: entry.status == AttendanceStatus.late ? 'late' : 'active')),
                   DataCell(Text(entry.timeIn)),
                   DataCell(Text(entry.timeOut)),
                   DataCell(Text(entry.detail)),

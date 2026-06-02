@@ -5,6 +5,7 @@ import '../../shared/widgets/admin_widgets.dart';
 import '../../shared/widgets/app_widgets.dart';
 import '../../shared/widgets/loading_widget.dart';
 import 'viewmodels/attendance_status_viewmodel.dart';
+import '../../core/constants/enums.dart';
 
 part 'widgets/attendance_status_table.dart';
 

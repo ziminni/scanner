@@ -1,39 +1,124 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 
-import '../../core/services/app_controller.dart';
-import '../../core/constants/enums.dart';
-import '../../models/models.dart';
-import '../../routes/app_routes.dart';
 import '../../core/constants/colors.dart';
+import '../../core/services/app_controller.dart';
+import '../../core/theme/app_theme.dart';
+import '../../features/admin/view/admin_pages.dart';
+import '../../features/scanner/view/scanner_screen.dart';
+import '../../models/enums.dart';
+import '../../models/models.dart';
 
 class AppShell extends StatelessWidget {
-  const AppShell({super.key, required this.currentPage, required this.child});
-
-  final String currentPage;
-  final Widget child;
+  const AppShell({super.key});
 
   @override
   Widget build(BuildContext context) {
     final app = AppScope.of(context);
     final user = app.currentUser!;
+    final screenWidth = MediaQuery.sizeOf(context).width;
     final items = _itemsFor(user.role);
-    final currentIndex = items
-        .indexWhere((item) => item.id == currentPage)
+    final currentIndex = items.isEmpty
+      ? 0
+      : items
+        .indexWhere((item) => item.id == app.currentPage)
         .clamp(0, items.length - 1);
     final bottomItems = items.take(5).toList();
-    final bottomIndex = bottomItems
-        .indexWhere((item) => item.id == currentPage)
+    final bottomIndex = bottomItems.isEmpty
+      ? 0
+      : bottomItems
+        .indexWhere((item) => item.id == app.currentPage)
         .clamp(0, bottomItems.length - 1);
+    final systemAdmin = user.role == UserRole.systemAdministrator;
 
-    return Scaffold(
+    final shell = Scaffold(
+      backgroundColor: systemAdmin ? AppColors.adminBackground : null,
       appBar: AppBar(
-        title: Text(user.role.label),
+        titleSpacing: screenWidth >= 900 ? 20 : 12,
+        title: screenWidth >= 900
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'ATTENDANCE',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.adminText,
+                        ),
+                  ),
+                  Text(
+                    'School Monitoring System',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.adminText.withValues(alpha: 0.72),
+                        ),
+                  ),
+                ],
+              )
+            : Text(
+                'ATTENDANCE',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.adminText,
+                    ),
+              ),
         actions: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Center(child: Text(user.fullName)),
+          IconButton(
+            tooltip: 'Notifications',
+            icon: const Icon(Icons.notifications_none_outlined),
+            onPressed: () {},
           ),
+          if (screenWidth >= 1000) ...[
+            const VerticalDivider(width: 1, indent: 16, endIndent: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    user.fullName,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  Text(
+                    user.role.label,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.adminText.withValues(alpha: 0.72),
+                        ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(right: 16),
+              child: CircleAvatar(
+                radius: 16,
+                backgroundColor: AppColors.adminAccent,
+                child: Text(
+                  _initials(user.fullName),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+          ] else ...[
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: CircleAvatar(
+                radius: 15,
+                backgroundColor: AppColors.adminAccent,
+                child: Text(
+                  _initials(user.fullName),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+          ],
           IconButton(
             tooltip: 'Logout',
             icon: const Icon(Icons.logout),
@@ -45,8 +130,8 @@ class AppShell extends StatelessWidget {
         builder: (context, constraints) {
           final compact = constraints.maxWidth < 760;
           final extended = constraints.maxWidth > 1100;
-          if (compact) return child;
-          final systemAdmin = user.role == UserRole.systemAdministrator;
+          final content = _pageFor(context, app.currentPage);
+          if (compact) return content;
           return Row(
             children: [
               if (systemAdmin)
@@ -54,7 +139,7 @@ class AppShell extends StatelessWidget {
                   items: items,
                   currentIndex: currentIndex,
                   user: user,
-                  onSelected: (index) => context.go(AppRoutes.pathForPage(items[index].id)),
+                  onSelected: (index) => app.go(items[index].id),
                 )
               else ...[
                 NavigationRail(
@@ -62,72 +147,8 @@ class AppShell extends StatelessWidget {
                   labelType: extended
                       ? NavigationRailLabelType.none
                       : NavigationRailLabelType.all,
-                  minExtendedWidth: 260,
+                  minExtendedWidth: 220,
                   extended: extended,
-                  leading: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 18.0, horizontal: 8),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.primaryContainer,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Icon(Icons.school, color: Theme.of(context).colorScheme.onPrimaryContainer),
-                        ),
-                        if (extended) ...[
-                          const SizedBox(width: 12),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('ATTENDANCE', style: Theme.of(context).textTheme.titleSmall?.copyWith(color: Colors.white, fontWeight: FontWeight.w800)),
-                              Text('School Monitoring System', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.mint.withAlpha(200))),
-                            ],
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                  trailing: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 18.0, horizontal: 8),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Colors.transparent,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Row(
-                              children: [
-                                CircleAvatar(
-                                  backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                                  child: Text(user.fullName.isNotEmpty ? user.fullName[0] : 'U', style: TextStyle(color: Theme.of(context).colorScheme.onPrimaryContainer)),
-                                ),
-                                if (extended) ...[
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(user.role.label, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.mint.withAlpha(220))),
-                                        Text(user.email, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.mint.withAlpha(200))),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  indicatorShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   destinations: [
                     for (final item in items)
                       NavigationRailDestination(
@@ -136,12 +157,11 @@ class AppShell extends StatelessWidget {
                         label: Text(item.label),
                       ),
                   ],
-                  onDestinationSelected: (index) =>
-                      context.go(AppRoutes.pathForPage(items[index].id)),
+                  onDestinationSelected: (index) => app.go(items[index].id),
                 ),
                 const VerticalDivider(width: 1),
               ],
-              Expanded(child: child),
+              Expanded(child: content),
             ],
           );
         },
@@ -149,9 +169,12 @@ class AppShell extends StatelessWidget {
       bottomNavigationBar: MediaQuery.sizeOf(context).width >= 760
           ? null
           : NavigationBar(
+              backgroundColor: systemAdmin ? AppColors.adminPrimary : null,
+              indicatorColor: systemAdmin
+                  ? AppColors.adminAccent.withValues(alpha: 0.18)
+                  : null,
               selectedIndex: bottomIndex,
-              onDestinationSelected: (index) =>
-                  context.go(AppRoutes.pathForPage(bottomItems[index].id)),
+              onDestinationSelected: (index) => app.go(bottomItems[index].id),
               destinations: [
                 for (final item in bottomItems)
                   NavigationDestination(
@@ -162,48 +185,91 @@ class AppShell extends StatelessWidget {
               ],
             ),
     );
+    return systemAdmin
+        ? Theme(data: AppTheme.systemAdmin(Theme.of(context)), child: shell)
+        : shell;
+  }
+
+  Widget _pageFor(BuildContext context, String pageId) {
+    final page = switch (pageId) {
+      'dashboard' => const DashboardPage(),
+      'users' => const UserManagementPage(),
+      'audit' => const AuditLogsPage(),
+      'settings' => const SystemSettingsPage(),
+      'database' => const DatabaseManagementPage(),
+      'archives' => const ArchiveManagementPage(),
+      'scannerUsers' => const ScannerUsersPage(),
+      'schoolYears' => const SchoolYearPage(),
+      'students' => const StudentsPage(),
+      'sections' => const SectionsPage(),
+      'teachers' => const TeachersPage(),
+      'logs' => const AttendanceLogsPage(),
+      'attendanceStatus' => const AttendanceStatusPage(),
+      'earlyStudents' => const EarlyStudentsPage(),
+      'reports' => const ReportsExportPage(),
+      'scanner' => const ScannerScreen(),
+      _ => const DashboardPage(),
+    };
+    if (_requiresActiveSchoolYear(pageId)) {
+      return _ActiveSchoolYearGate(child: page);
+    }
+    return page;
+  }
+
+  bool _requiresActiveSchoolYear(String pageId) {
+    return const {
+      'scannerUsers',
+      'students',
+      'sections',
+      'teachers',
+      'logs',
+      'attendanceStatus',
+      'earlyStudents',
+      'reports',
+      'scanner',
+    }.contains(pageId);
   }
 
   List<_NavItem> _itemsFor(UserRole role) {
     return switch (role) {
       UserRole.systemAdministrator => const [
         _NavItem(
-          AppRoutes.dashboard,
+          'dashboard',
           'Dashboard',
           'Home',
           Icons.dashboard_outlined,
           Icons.dashboard,
         ),
         _NavItem(
-          AppRoutes.users,
+          'users',
           'User Management',
           'Users',
           Icons.manage_accounts_outlined,
           Icons.manage_accounts,
         ),
         _NavItem(
-          AppRoutes.audit,
+          'audit',
           'Audit Logs',
           'Audit',
           Icons.fact_check_outlined,
           Icons.fact_check,
         ),
         _NavItem(
-          AppRoutes.settings,
+          'settings',
           'System Settings',
           'Settings',
           Icons.tune_outlined,
           Icons.tune,
         ),
         _NavItem(
-          AppRoutes.database,
+          'database',
           'Database Management',
           'Data',
           Icons.storage_outlined,
           Icons.storage,
         ),
         _NavItem(
-          AppRoutes.archives,
+          'archives',
           'Archive Management',
           'Archives',
           Icons.archive_outlined,
@@ -212,77 +278,77 @@ class AppShell extends StatelessWidget {
       ],
       UserRole.schoolAdministrator => const [
         _NavItem(
-          AppRoutes.dashboard,
+          'dashboard',
           'Dashboard',
           'Home',
           Icons.dashboard_outlined,
           Icons.dashboard,
         ),
         _NavItem(
-          AppRoutes.scannerUsers,
+          'scannerUsers',
           'Scanner Users',
           'Scanners',
           Icons.qr_code_scanner,
           Icons.qr_code_scanner,
         ),
         _NavItem(
-          AppRoutes.schoolYears,
+          'schoolYears',
           'School Year',
           'Years',
           Icons.calendar_month_outlined,
           Icons.calendar_month,
         ),
         _NavItem(
-          AppRoutes.students,
+          'students',
           'Students',
           'Students',
           Icons.school_outlined,
           Icons.school,
         ),
         _NavItem(
-          AppRoutes.sections,
+          'sections',
           'Sections',
           'Sections',
           Icons.groups_outlined,
           Icons.groups,
         ),
         _NavItem(
-          AppRoutes.teachers,
+          'teachers',
           'Teachers',
           'Teachers',
           Icons.badge_outlined,
           Icons.badge,
         ),
         _NavItem(
-          AppRoutes.logs,
+          'logs',
           'Attendance Logs',
           'Logs',
           Icons.list_alt_outlined,
           Icons.list_alt,
         ),
         _NavItem(
-          AppRoutes.attendanceStatus,
+          'attendanceStatus',
           'Attendance Status',
           'Status',
           Icons.warning_amber_outlined,
           Icons.warning,
         ),
         _NavItem(
-          AppRoutes.earlyStudents,
+          'earlyStudents',
           'Early Students',
           'Early',
           Icons.emoji_events_outlined,
           Icons.emoji_events,
         ),
         _NavItem(
-          AppRoutes.reports,
+          'reports',
           'Reports & Export',
           'Reports',
           Icons.file_download_outlined,
           Icons.file_download,
         ),
         _NavItem(
-          AppRoutes.archives,
+          'archives',
           'Archives',
           'Archives',
           Icons.archive_outlined,
@@ -291,14 +357,14 @@ class AppShell extends StatelessWidget {
       ],
       UserRole.staffScanner => const [
         _NavItem(
-          AppRoutes.scanner,
+          'scanner',
           'Scan IDs',
           'Scan',
           Icons.qr_code_scanner,
           Icons.qr_code_scanner,
         ),
         _NavItem(
-          AppRoutes.logs,
+          'logs',
           'Logs',
           'Logs',
           Icons.list_alt_outlined,
@@ -307,13 +373,6 @@ class AppShell extends StatelessWidget {
       ],
     };
   }
-}
-
-String _initials(String fullName) {
-  final parts = fullName.trim().split(RegExp(r'\s+'));
-  if (parts.isEmpty || parts.first.isEmpty) return 'A';
-  if (parts.length == 1) return parts.first.substring(0, 1).toUpperCase();
-  return '${parts.first.substring(0, 1)}${parts[1].substring(0, 1)}'.toUpperCase();
 }
 
 class _SystemAdminSidebar extends StatelessWidget {
@@ -343,7 +402,7 @@ class _SystemAdminSidebar extends StatelessWidget {
         border: const Border(right: BorderSide(color: AppColors.adminBorder)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withAlpha(8),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 8,
             offset: const Offset(0, 3),
           ),
@@ -364,7 +423,7 @@ class _SystemAdminSidebar extends StatelessWidget {
               margin: const EdgeInsets.only(top: 8),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppColors.adminSidebarActive.withAlpha(184),
+                color: AppColors.adminSidebarActive.withValues(alpha: 0.72),
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Row(
@@ -425,6 +484,13 @@ class _SystemAdminSidebar extends StatelessWidget {
   }
 }
 
+String _initials(String fullName) {
+  final parts = fullName.trim().split(RegExp(r'\s+'));
+  if (parts.isEmpty || parts.first.isEmpty) return 'A';
+  if (parts.length == 1) return parts.first.substring(0, 1).toUpperCase();
+  return '${parts.first.substring(0, 1)}${parts[1].substring(0, 1)}'.toUpperCase();
+}
+
 class _SystemAdminSidebarItem extends StatelessWidget {
   const _SystemAdminSidebarItem({
     required this.item,
@@ -439,11 +505,11 @@ class _SystemAdminSidebarItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textColor = selected
-        ? Colors.white
-        : Colors.white.withAlpha(216);
+      ? Colors.white
+      : Colors.white.withValues(alpha: 0.84);
     final iconColor = selected
-        ? Colors.white
-        : Colors.white.withAlpha(179);
+      ? Colors.white
+      : Colors.white.withValues(alpha: 0.70);
     final screenWidth = MediaQuery.sizeOf(context).width;
     final isCompact = screenWidth < 900;
     final itemHeight = isCompact ? 52.0 : 64.0;
@@ -454,7 +520,7 @@ class _SystemAdminSidebarItem extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(10),
-        hoverColor: AppColors.adminSidebarActive.withAlpha(184),
+        hoverColor: AppColors.adminSidebarActive.withValues(alpha: 0.72),
         child: Container(
           height: itemHeight,
           padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -478,7 +544,7 @@ class _SystemAdminSidebarItem extends StatelessWidget {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: selected ? AppColors.adminAccent : AppColors.adminSidebarMuted.withAlpha(51),
+                  color: selected ? AppColors.adminAccent : AppColors.adminSidebarMuted.withValues(alpha: 0.20),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(selected ? item.selectedIcon : item.icon, color: iconColor),
@@ -507,8 +573,8 @@ class _SystemAdminSidebarItem extends StatelessWidget {
   }
 }
 
-class ActiveSchoolYearGate extends StatelessWidget {
-  const ActiveSchoolYearGate({super.key, required this.child});
+class _ActiveSchoolYearGate extends StatelessWidget {
+  const _ActiveSchoolYearGate({required this.child});
 
   final Widget child;
 
@@ -550,9 +616,7 @@ class ActiveSchoolYearGate extends StatelessWidget {
                     FilledButton.icon(
                       icon: const Icon(Icons.add),
                       label: const Text('Go to School Year'),
-                      onPressed: () => context.go(
-                        AppRoutes.pathForPage(AppRoutes.schoolYears),
-                      ),
+                      onPressed: () => app.go('schoolYears'),
                     ),
                   ],
                 ),

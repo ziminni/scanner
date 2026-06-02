@@ -2,18 +2,8 @@ import 'package:flutter/material.dart';
 
 class AppColors {
   const AppColors._();
-  // Primary brand color (kept for backward compat)
+
   static const primary = Color(0xFF2563EB);
-
-  // Legacy green tones (kept for places that still reference them)
-  static const mint = Color(0xFFEFF8F4);
-  static const dark = Color(0xFF244E43);
-
-  // Status colors
-  static const warn = Color(0xFFF6A623);
-  static const success = Color(0xFF2FAF6B);
-
-  // Admin / sidebar palette (new design)
   static const adminPrimary = Color(0xFF2F6B57);
   static const adminAccent = Color(0xFF4EA07F);
   static const adminText = Color(0xFF17352B);

@@ -123,7 +123,7 @@ class _CollectionTableBody extends StatelessWidget {
                   DataRow(
                     cells: [
                       for (final column in columns)
-                        DataCell(Text(adminFormatValue(doc.data()[column]))),
+                        DataCell(_buildCell(context, doc.data()[column], column)),
                       DataCell(
                         Row(
                           mainAxisSize: MainAxisSize.min,
@@ -156,6 +156,22 @@ class _CollectionTableBody extends StatelessWidget {
       },
     );
   }
+
+  Widget _buildCell(BuildContext context, Object? value, String column) {
+    final lower = column.toLowerCase();
+    if (lower.contains('status')) {
+      final label = value?.toString() ?? '-';
+      final type = label.toLowerCase().contains('late')
+          ? 'late'
+          : label.toLowerCase().contains('disabled')
+              ? 'disabled'
+              : 'active';
+      return StatusBadge(label: label, type: type);
+    }
+    if (value is Timestamp) return TimestampText(value);
+    if (value is DateTime) return TimestampText(value);
+    return Text(adminFormatValue(value));
+  }
 }
 
 class AdminPage extends StatelessWidget {
@@ -173,19 +189,17 @@ class AdminPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       children: [
-        Wrap(
-          alignment: WrapAlignment.spaceBetween,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          spacing: 12,
-          runSpacing: 12,
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Text(title, style: Theme.of(context).textTheme.headlineSmall),
-            Wrap(spacing: 8, runSpacing: 8, children: actions),
+            Text(title, style: Theme.of(context).textTheme.headlineLarge),
+            Row(children: actions),
           ],
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 18),
         child,
       ],
     );
@@ -199,11 +213,20 @@ class DataSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
       width: double.infinity,
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
-        borderRadius: BorderRadius.circular(8),
+        color: theme.cardTheme.color ?? Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(8),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: child,
     );

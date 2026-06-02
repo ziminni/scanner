@@ -7,72 +7,14 @@ class AppTheme {
   const AppTheme._();
 
   static ThemeData light() {
-    final colorScheme = ColorScheme.fromSeed(
-      seedColor: AppColors.primary,
-      brightness: Brightness.light,
-    );
-
+    final colorScheme = ColorScheme.fromSeed(seedColor: AppColors.primary);
     return ThemeData(
-      colorScheme: colorScheme.copyWith(
-        primary: AppColors.primary,
-        surface: Colors.white,
-        secondary: colorScheme.secondary,
-      ),
-      scaffoldBackgroundColor: AppColors.mint,
+      colorScheme: colorScheme,
       useMaterial3: true,
-      appBarTheme: AppBarTheme(
-        backgroundColor: Colors.white,
-        foregroundColor: AppColors.dark,
-        elevation: 0,
-        centerTitle: false,
-        iconTheme: IconThemeData(color: AppColors.dark),
-      ),
-      cardTheme: CardThemeData(
-        color: Colors.white,
-        elevation: 0,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
       inputDecorationTheme: const InputDecorationTheme(
-        filled: true,
-        fillColor: Color(0xFFF3FAF6),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.all(Radius.circular(8)),
-          borderSide: BorderSide.none,
         ),
-      ),
-      elevatedButtonTheme: ElevatedButtonThemeData(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primary,
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-      ),
-      textTheme: Typography.material2021().black.apply(
-        bodyColor: AppColors.dark,
-        displayColor: AppColors.dark,
-      ),
-      navigationRailTheme: NavigationRailThemeData(
-        backgroundColor: AppColors.dark,
-        selectedIconTheme: const IconThemeData(color: Colors.white),
-        unselectedIconTheme: IconThemeData(color: AppColors.mint.withAlpha(204)),
-        selectedLabelTextStyle: const TextStyle(color: Colors.white),
-        unselectedLabelTextStyle: TextStyle(color: AppColors.mint.withAlpha(230)),
-        elevation: 0,
-      ),
-      navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: AppColors.dark,
-        indicatorColor: AppColors.primary.withAlpha(31),
-        labelTextStyle: WidgetStateProperty.all(TextStyle(color: AppColors.mint)),
-      ),
-      dataTableTheme: DataTableThemeData(
-        headingRowColor: WidgetStateProperty.all(Colors.transparent),
-        dataRowColor: WidgetStateProperty.resolveWith((states) => Colors.white),
-        headingTextStyle: TextStyle(
-          color: AppColors.dark,
-          fontWeight: FontWeight.w700,
-        ),
-        dataTextStyle: TextStyle(color: AppColors.dark.withAlpha(217)),
-        dividerThickness: 1,
       ),
     );
   }
@@ -107,7 +49,7 @@ class AppTheme {
       ),
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: AppColors.adminSurface,
-        indicatorColor: AppColors.adminAccent.withAlpha(31),
+        indicatorColor: AppColors.adminAccent.withValues(alpha: 0.12),
         labelTextStyle: WidgetStatePropertyAll(
           GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600),
         ),
@@ -142,13 +84,19 @@ class AppTheme {
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.adminAccent,
           side: BorderSide(
-            color: AppColors.adminAccent.withAlpha(140),
+            color: AppColors.adminAccent.withValues(alpha: 0.55),
           ),
           textStyle: GoogleFonts.outfit(fontWeight: FontWeight.w700),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
           ),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: AppColors.adminAccent,
+          textStyle: GoogleFonts.outfit(fontWeight: FontWeight.w700),
         ),
       ),
       inputDecorationTheme: base.inputDecorationTheme.copyWith(
@@ -161,13 +109,13 @@ class AppTheme {
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide(
-            color: AppColors.adminAccent.withAlpha(56),
+            color: AppColors.adminAccent.withValues(alpha: 0.22),
           ),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide(
-            color: AppColors.adminAccent.withAlpha(56),
+            color: AppColors.adminAccent.withValues(alpha: 0.22),
           ),
         ),
         focusedBorder: OutlineInputBorder(
@@ -214,7 +162,7 @@ class AppTheme {
           fontWeight: FontWeight.w600,
         ),
         subtitleTextStyle: textTheme.bodyMedium?.copyWith(
-          color: AppColors.adminText.withAlpha(168),
+          color: AppColors.adminText.withValues(alpha: 0.66),
         ),
       ),
       iconButtonTheme: IconButtonThemeData(
