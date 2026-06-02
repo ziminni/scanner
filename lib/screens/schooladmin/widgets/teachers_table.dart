@@ -1,9 +1,27 @@
 part of '../teachers_page.dart';
 
-class _TeachersTable extends StatelessWidget {
+class _TeachersTable extends StatefulWidget {
   const _TeachersTable({required this.search});
 
   final String search;
+
+  @override
+  State<_TeachersTable> createState() => _TeachersTableState();
+}
+
+class _TeachersTableState extends State<_TeachersTable> {
+  static const List<int> _itemsPerPageOptions = [10, 25, 50, 100];
+
+  int _currentPage = 0;
+  int _itemsPerPage = 10;
+
+  @override
+  void didUpdateWidget(covariant _TeachersTable oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.search != widget.search) {
+      _currentPage = 0;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -22,7 +40,7 @@ class _TeachersTable extends StatelessWidget {
               .where('archived', isEqualTo: false)
               .snapshots(),
           builder: (context, snapshot) {
-            final query = search.trim().toLowerCase();
+            final query = widget.search.trim().toLowerCase();
             final docs = (snapshot.data?.docs ?? []).where((doc) {
               final data = doc.data();
               if (query.isEmpty) return true;
@@ -34,94 +52,141 @@ class _TeachersTable extends StatelessWidget {
             if (docs.isEmpty) {
               return const EmptyState(title: 'No teachers found');
             }
+            final totalPages = (docs.length / _itemsPerPage).ceil();
+            final currentPage = totalPages == 0
+                ? 0
+                : _currentPage.clamp(0, totalPages - 1).toInt();
+            final start = currentPage * _itemsPerPage;
+            final end = (start + _itemsPerPage).clamp(0, docs.length).toInt();
+            final paginatedDocs = docs.sublist(start, end);
 
             return DataSurface(
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: DataTable(
-                  headingRowHeight: 44,
-                  dataRowMinHeight: 52,
-                  dataRowMaxHeight: 64,
-                  columns: const [
-                    DataColumn(label: Text('Teacher ID')),
-                    DataColumn(label: Text('Name')),
-                    DataColumn(label: Text('Birthdate')),
-                    DataColumn(label: Text('Address')),
-                    DataColumn(label: Text('Contact')),
-                    DataColumn(label: Text('Schedule')),
-                    DataColumn(label: Text('Actions')),
-                  ],
-                  rows: [
-                    for (final doc in docs)
-                      DataRow(
-                        cells: [
-                          DataCell(
-                            Text(doc.data()['teacherId'] as String? ?? '-'),
-                          ),
-                          DataCell(Text(_teacherName(doc.data()))),
-                          DataCell(Text(_teacherBirthdate(doc.data()))),
-                          DataCell(
-                            Text(doc.data()['address'] as String? ?? '-'),
-                          ),
-                          DataCell(
-                            Text(doc.data()['contactNumber'] as String? ?? '-'),
-                          ),
-                          DataCell(Text(_teacherSchedule(doc.data()))),
-                          DataCell(
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  tooltip: 'Edit',
-                                  icon: const Icon(Icons.edit_outlined),
-                                  onPressed: () => showDialog<void>(
-                                    context: context,
-                                    builder: (_) => _EditTeacherDialog(
-                                      schoolYearId: schoolYear.id,
-                                      docId: doc.id,
-                                      data: doc.data(),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  FullWidthHorizontalTable(
+                    child: DataTable(
+                      headingRowHeight: 44,
+                      dataRowMinHeight: 52,
+                      dataRowMaxHeight: 64,
+                      columns: const [
+                        DataColumn(label: Text('Teacher ID')),
+                        DataColumn(label: Text('Name')),
+                        DataColumn(label: Text('Birthdate')),
+                        DataColumn(label: Text('Address')),
+                        DataColumn(label: Text('Contact')),
+                        DataColumn(label: Text('Schedule')),
+                        DataColumn(label: Text('Actions')),
+                      ],
+                      rows: [
+                        for (final doc in paginatedDocs)
+                          DataRow(
+                            cells: [
+                              DataCell(
+                                Text(
+                                  doc.data()['teacherId'] as String? ?? '-',
+                                ),
+                              ),
+                              DataCell(Text(_teacherName(doc.data()))),
+                              DataCell(Text(_teacherBirthdate(doc.data()))),
+                              DataCell(
+                                Text(doc.data()['address'] as String? ?? '-'),
+                              ),
+                              DataCell(
+                                Text(
+                                  doc.data()['contactNumber'] as String? ??
+                                      '-',
+                                ),
+                              ),
+                              DataCell(Text(_teacherSchedule(doc.data()))),
+                              DataCell(
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      tooltip: 'Edit',
+                                      icon: const Icon(Icons.edit_outlined),
+                                      onPressed: () => showDialog<void>(
+                                        context: context,
+                                        builder: (_) => _EditTeacherDialog(
+                                          schoolYearId: schoolYear.id,
+                                          docId: doc.id,
+                                          data: doc.data(),
+                                        ),
+                                      ),
                                     ),
-                                  ),
-                                ),
-                                IconButton(
-                                  tooltip: 'Archive',
-                                  icon: const Icon(Icons.archive_outlined),
-                                  onPressed: () async {
-                                    final confirmed =
-                                        await _confirmArchiveTeacher(
-                                          context,
-                                          _teacherName(doc.data()),
+                                    IconButton(
+                                      tooltip: 'Archive',
+                                      icon: const Icon(Icons.archive_outlined),
+                                      onPressed: () async {
+                                        final confirmed =
+                                            await _confirmArchiveTeacher(
+                                              context,
+                                              _teacherName(doc.data()),
+                                            );
+                                        if (!confirmed || !context.mounted) {
+                                          return;
+                                        }
+                                        await app.repository
+                                            .schoolYearCollection(
+                                              schoolYear.id,
+                                              'teachers',
+                                            )
+                                            .doc(doc.id)
+                                            .set({
+                                              'archived': true,
+                                              'archivedAt':
+                                                  FieldValue.serverTimestamp(),
+                                            }, SetOptions(merge: true));
+                                        await app.audit.record(
+                                          action: 'teachers_archived',
+                                          actorId: app.currentUser!.id,
+                                          actorName: app.currentUser!.fullName,
+                                          target:
+                                              doc.data()['teacherId']
+                                                  as String? ??
+                                              doc.id,
+                                          metadata: {
+                                            'schoolYear': schoolYear.name,
+                                          },
                                         );
-                                    if (!confirmed || !context.mounted) return;
-                                    await app.repository
-                                        .schoolYearCollection(
-                                          schoolYear.id,
-                                          'teachers',
-                                        )
-                                        .doc(doc.id)
-                                        .set({
-                                          'archived': true,
-                                          'archivedAt':
-                                              FieldValue.serverTimestamp(),
-                                        }, SetOptions(merge: true));
-                                    await app.audit.record(
-                                      action: 'teachers_archived',
-                                      actorId: app.currentUser!.id,
-                                      actorName: app.currentUser!.fullName,
-                                      target:
-                                          doc.data()['teacherId'] as String? ??
-                                          doc.id,
-                                      metadata: {'schoolYear': schoolYear.name},
-                                    );
-                                  },
+                                      },
+                                    ),
+                                  ],
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  AdminTableFooter(
+                    currentPage: currentPage,
+                    totalItems: docs.length,
+                    itemsPerPage: _itemsPerPage,
+                    itemLabel: 'teachers',
+                    itemsPerPageOptions: _itemsPerPageOptions,
+                    onItemsPerPageChanged: (value) {
+                      setState(() {
+                        _itemsPerPage = value;
+                        _currentPage = 0;
+                      });
+                    },
+                  ),
+                  if (totalPages > 1) ...[
+                    const SizedBox(height: 8),
+                    AdminPaginationControls(
+                      currentPage: currentPage,
+                      totalPages: totalPages,
+                      onPageChanged: (page) {
+                        setState(() {
+                          _currentPage = page;
+                        });
+                      },
+                    ),
                   ],
-                ),
+                ],
               ),
             );
           },

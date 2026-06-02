@@ -1,3 +1,5 @@
+// app_shell.dart - Refactored version
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -26,145 +28,83 @@ class AppShell extends StatelessWidget {
         .indexWhere((item) => item.id == currentPage)
         .clamp(0, bottomItems.length - 1);
 
+    final isCompact = MediaQuery.sizeOf(context).width < 760;
+
+    if (isCompact) {
+      // Mobile layout with bottom nav
+      return Scaffold(
+        appBar: AppBar(
+          title: Text(user.role.label),
+          actions: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Center(child: Text(user.fullName)),
+            ),
+            IconButton(
+              tooltip: 'Logout',
+              icon: const Icon(Icons.logout),
+              onPressed: app.logout,
+            ),
+          ],
+        ),
+        body: child,
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: bottomIndex,
+          onDestinationSelected: (index) =>
+              context.go(AppRoutes.pathForPage(bottomItems[index].id)),
+          destinations: [
+            for (final item in bottomItems)
+              NavigationDestination(
+                icon: Icon(item.icon),
+                selectedIcon: Icon(item.selectedIcon),
+                label: item.shortLabel,
+              ),
+          ],
+        ),
+      );
+    }
+
+    // Desktop layout: full-height sidebar + content area with integrated header
     return Scaffold(
-      appBar: AppBar(
-        title: Text(user.role.label),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Center(child: Text(user.fullName)),
-          ),
-          IconButton(
-            tooltip: 'Logout',
-            icon: const Icon(Icons.logout),
-            onPressed: app.logout,
+      body: Row(
+        children: [
+          // Full-height sidebar
+          if (user.role == UserRole.systemAdministrator ||
+              user.role == UserRole.schoolAdministrator)
+            _AdminSidebar(
+              items: items,
+              currentIndex: currentIndex,
+              user: user,
+              onSelected: (index) =>
+                  context.go(AppRoutes.pathForPage(items[index].id)),
+            )
+          else
+            _StandardSidebar(
+              items: items,
+              currentIndex: currentIndex,
+              user: user,
+              onSelected: (index) =>
+                  context.go(AppRoutes.pathForPage(items[index].id)),
+            ),
+
+          // Content area with integrated header
+          Expanded(
+            child: Column(
+              children: [
+                // Integrated header (replaces AppBar)
+                _ContentHeader(user: user, onLogout: app.logout),
+                const Divider(height: 1, thickness: 1),
+                Expanded(child: child),
+              ],
+            ),
           ),
         ],
       ),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final compact = constraints.maxWidth < 760;
-          final extended = constraints.maxWidth > 1100;
-          if (compact) return child;
-          final systemAdmin = user.role == UserRole.systemAdministrator;
-          return Row(
-            children: [
-              if (systemAdmin)
-                _SystemAdminSidebar(
-                  items: items,
-                  currentIndex: currentIndex,
-                  user: user,
-                  onSelected: (index) => context.go(AppRoutes.pathForPage(items[index].id)),
-                )
-              else ...[
-                NavigationRail(
-                  selectedIndex: currentIndex,
-                  labelType: extended
-                      ? NavigationRailLabelType.none
-                      : NavigationRailLabelType.all,
-                  minExtendedWidth: 260,
-                  extended: extended,
-                  leading: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 18.0, horizontal: 8),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.primaryContainer,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Icon(Icons.school, color: Theme.of(context).colorScheme.onPrimaryContainer),
-                        ),
-                        if (extended) ...[
-                          const SizedBox(width: 12),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('ATTENDANCE', style: Theme.of(context).textTheme.titleSmall?.copyWith(color: Colors.white, fontWeight: FontWeight.w800)),
-                              Text('School Monitoring System', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.mint.withAlpha(200))),
-                            ],
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                  trailing: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 18.0, horizontal: 8),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Colors.transparent,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Row(
-                              children: [
-                                CircleAvatar(
-                                  backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                                  child: Text(user.fullName.isNotEmpty ? user.fullName[0] : 'U', style: TextStyle(color: Theme.of(context).colorScheme.onPrimaryContainer)),
-                                ),
-                                if (extended) ...[
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(user.role.label, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.mint.withAlpha(220))),
-                                        Text(user.email, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.mint.withAlpha(200))),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  indicatorShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  destinations: [
-                    for (final item in items)
-                      NavigationRailDestination(
-                        icon: Icon(item.icon),
-                        selectedIcon: Icon(item.selectedIcon),
-                        label: Text(item.label),
-                      ),
-                  ],
-                  onDestinationSelected: (index) =>
-                      context.go(AppRoutes.pathForPage(items[index].id)),
-                ),
-                const VerticalDivider(width: 1),
-              ],
-              Expanded(child: child),
-            ],
-          );
-        },
-      ),
-      bottomNavigationBar: MediaQuery.sizeOf(context).width >= 760
-          ? null
-          : NavigationBar(
-              selectedIndex: bottomIndex,
-              onDestinationSelected: (index) =>
-                  context.go(AppRoutes.pathForPage(bottomItems[index].id)),
-              destinations: [
-                for (final item in bottomItems)
-                  NavigationDestination(
-                    icon: Icon(item.icon),
-                    selectedIcon: Icon(item.selectedIcon),
-                    label: item.shortLabel,
-                  ),
-              ],
-            ),
     );
   }
 
   List<_NavItem> _itemsFor(UserRole role) {
+    // ... (keep your existing implementation)
     return switch (role) {
       UserRole.systemAdministrator => const [
         _NavItem(
@@ -204,8 +144,8 @@ class AppShell extends StatelessWidget {
         ),
         _NavItem(
           AppRoutes.archives,
-          'Archive Management',
-          'Archives',
+          'Completed School Years',
+          'History',
           Icons.archive_outlined,
           Icons.archive,
         ),
@@ -281,13 +221,6 @@ class AppShell extends StatelessWidget {
           Icons.file_download_outlined,
           Icons.file_download,
         ),
-        _NavItem(
-          AppRoutes.archives,
-          'Archives',
-          'Archives',
-          Icons.archive_outlined,
-          Icons.archive,
-        ),
       ],
       UserRole.staffScanner => const [
         _NavItem(
@@ -309,15 +242,76 @@ class AppShell extends StatelessWidget {
   }
 }
 
-String _initials(String fullName) {
-  final parts = fullName.trim().split(RegExp(r'\s+'));
-  if (parts.isEmpty || parts.first.isEmpty) return 'A';
-  if (parts.length == 1) return parts.first.substring(0, 1).toUpperCase();
-  return '${parts.first.substring(0, 1)}${parts[1].substring(0, 1)}'.toUpperCase();
+// New: Content Header (replaces AppBar)
+class _ContentHeader extends StatelessWidget {
+  const _ContentHeader({required this.user, required this.onLogout});
+
+  final AppUser user;
+  final VoidCallback onLogout;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 64,
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        border: const Border(bottom: BorderSide(color: Colors.black12)),
+      ),
+      child: Row(
+        children: [
+          // Page title could go here dynamically, or keep it simple
+          Text(
+            user.role.label,
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
+          ),
+          const Spacer(),
+          // User info
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.grey.withAlpha(26),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircleAvatar(radius: 16, child: Text(_initials(user.fullName))),
+                const SizedBox(width: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      user.fullName,
+                      style: const TextStyle(fontWeight: FontWeight.w500),
+                    ),
+                    Text(
+                      user.email,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+                const SizedBox(width: 16),
+                IconButton(
+                  tooltip: 'Logout',
+                  icon: const Icon(Icons.logout),
+                  onPressed: onLogout,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-class _SystemAdminSidebar extends StatelessWidget {
-  const _SystemAdminSidebar({
+// Unified Admin Sidebar - Full height with better responsive widths for system & school admins
+class _AdminSidebar extends StatelessWidget {
+  const _AdminSidebar({
     required this.items,
     required this.currentIndex,
     required this.user,
@@ -332,122 +326,279 @@ class _SystemAdminSidebar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.sizeOf(context).width;
-    final sidebarWidth = (screenWidth * 0.18).clamp(168.0, 260.0);
-    final horizontalPadding = screenWidth >= 1400 ? 16.0 : 12.0;
-    final verticalPadding = screenWidth >= 1400 ? 18.0 : 14.0;
+    // Better responsive width: min 240px, max 280px, or 16% of screen
+    final sidebarWidth = (screenWidth * 0.16).clamp(240.0, 280.0);
+    final horizontalPadding = sidebarWidth >= 260 ? 16.0 : 12.0;
+    final verticalPadding = 20.0;
 
     return Container(
-      width: sidebarWidth.toDouble(),
+      width: sidebarWidth,
       decoration: BoxDecoration(
         color: AppColors.adminSidebar,
         border: const Border(right: BorderSide(color: AppColors.adminBorder)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withAlpha(8),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
+            color: Colors.black.withAlpha(12),
+            blurRadius: 12,
+            offset: const Offset(2, 0),
           ),
         ],
       ),
-      child: ListView.separated(
-        padding: EdgeInsets.fromLTRB(
-          horizontalPadding,
-          verticalPadding,
-          horizontalPadding,
-          verticalPadding,
-        ),
-        itemCount: items.length + 1,
-        separatorBuilder: (_, i) => const SizedBox(height: 6),
-        itemBuilder: (context, index) {
-          if (index == items.length) {
-            return Container(
-              margin: const EdgeInsets.only(top: 8),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.adminSidebarActive.withAlpha(184),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 18,
-                    backgroundColor: AppColors.adminAccent,
-                    child: Text(
-                      _initials(user.fullName),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
+      child: Column(
+        children: [
+          // Logo/Brand area at top (using school logo image)
+          Container(
+            height: 64,
+            padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+            decoration: const BoxDecoration(
+              border: Border(bottom: BorderSide(color: Colors.white10)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    image: const DecorationImage(
+                      image: AssetImage('assets/img/logo.jpg'),
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text(
+                        'ATTENDANCE',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 11,
+                          letterSpacing: 0.5,
+                        ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          user.role.label,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 13,
-                          ),
+                      Text(
+                        'School Monitor',
+                        style: TextStyle(
+                          color: AppColors.mint.withAlpha(200),
+                          fontSize: 10,
                         ),
-                        Text(
-                          user.email,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 11,
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            );
-          }
-          final item = items[index];
-          final selected = index == currentIndex;
-          return _SystemAdminSidebarItem(
-            item: item,
-            selected: selected,
-            onTap: () => onSelected(index),
-          );
-        },
+                ),
+              ],
+            ),
+          ),
+          // Navigation items
+          Expanded(
+            child: ListView.separated(
+              padding: EdgeInsets.symmetric(vertical: verticalPadding),
+              itemCount: items.length,
+              separatorBuilder: (_, _) => const SizedBox(height: 4),
+              itemBuilder: (context, index) {
+                final item = items[index];
+                final selected = index == currentIndex;
+                return _AdminSidebarItem(
+                  item: item,
+                  selected: selected,
+                  onTap: () => onSelected(index),
+                  sidebarWidth: sidebarWidth,
+                );
+              },
+            ),
+          ),
+          // User profile card at bottom (now properly at bottom)
+          Container(
+            padding: EdgeInsets.all(horizontalPadding),
+            decoration: BoxDecoration(
+              color: AppColors.adminSidebarActive.withAlpha(184),
+              border: const Border(top: BorderSide(color: Colors.white10)),
+            ),
+            child: _UserProfileCard(user: user),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _SystemAdminSidebarItem extends StatelessWidget {
-  const _SystemAdminSidebarItem({
+// Standard Sidebar for non-admin users (using NavigationRail but full-height)
+class _StandardSidebar extends StatelessWidget {
+  const _StandardSidebar({
+    required this.items,
+    required this.currentIndex,
+    required this.user,
+    required this.onSelected,
+  });
+
+  final List<_NavItem> items;
+  final int currentIndex;
+  final AppUser user;
+  final ValueChanged<int> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    const expandedWidth = 240.0;
+    final isExpanded = screenWidth > 1100;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        border: const Border(right: BorderSide(color: Colors.black12)),
+      ),
+      child: NavigationRail(
+        selectedIndex: currentIndex,
+        labelType: isExpanded
+            ? NavigationRailLabelType.none
+            : NavigationRailLabelType.all,
+        minWidth: 56,
+        groupAlignment: -0.9,
+        minExtendedWidth: expandedWidth,
+        extended: isExpanded,
+        leading: isExpanded ? const SizedBox(height: 64) : null,
+        trailing: isExpanded
+            ? Padding(
+                padding: const EdgeInsets.all(12),
+                child: _UserProfileCardCompact(user: user),
+              )
+            : Tooltip(
+                message: user.fullName,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: CircleAvatar(
+                    radius: 18,
+                    child: Text(_initials(user.fullName)),
+                  ),
+                ),
+              ),
+        destinations: [
+          for (final item in items)
+            NavigationRailDestination(
+              icon: Icon(item.icon),
+              selectedIcon: Icon(item.selectedIcon),
+              label: Text(item.label),
+            ),
+        ],
+        onDestinationSelected: onSelected,
+      ),
+    );
+  }
+}
+
+// Reusable user profile card for sidebar bottom
+class _UserProfileCard extends StatelessWidget {
+  const _UserProfileCard({required this.user});
+
+  final AppUser user;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        CircleAvatar(
+          radius: 20,
+          backgroundColor: AppColors.adminAccent,
+          child: Text(
+            _initials(user.fullName),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                user.role.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                ),
+              ),
+              Text(
+                user.email,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Colors.white70, fontSize: 11),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// Compact version for collapsed sidebar
+class _UserProfileCardCompact extends StatelessWidget {
+  const _UserProfileCardCompact({required this.user});
+
+  final AppUser user;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        CircleAvatar(
+          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+          child: Text(_initials(user.fullName)),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          user.role.label,
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 4),
+        Text(
+          user.email,
+          style: const TextStyle(fontSize: 10),
+          textAlign: TextAlign.center,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ],
+    );
+  }
+}
+
+// Refactored Sidebar Item with better text handling
+class _AdminSidebarItem extends StatelessWidget {
+  const _AdminSidebarItem({
     required this.item,
     required this.selected,
     required this.onTap,
+    required this.sidebarWidth,
   });
 
   final _NavItem item;
   final bool selected;
   final VoidCallback onTap;
+  final double sidebarWidth;
 
   @override
   Widget build(BuildContext context) {
-    final textColor = selected
-        ? Colors.white
-        : Colors.white.withAlpha(216);
-    final iconColor = selected
-        ? Colors.white
-        : Colors.white.withAlpha(179);
-    final screenWidth = MediaQuery.sizeOf(context).width;
-    final isCompact = screenWidth < 900;
-    final itemHeight = isCompact ? 52.0 : 64.0;
-    final fontSize = isCompact ? 13.0 : 14.0;
+    final textColor = selected ? Colors.white : Colors.white.withAlpha(216);
+    final iconColor = selected ? Colors.white : Colors.white.withAlpha(179);
+    // Dynamic font size based on available width
+    final fontSize = sidebarWidth >= 260 ? 14.0 : 13.0;
+    final iconSize = sidebarWidth >= 260 ? 24.0 : 22.0;
 
     return Material(
       color: Colors.transparent,
@@ -456,46 +607,55 @@ class _SystemAdminSidebarItem extends StatelessWidget {
         borderRadius: BorderRadius.circular(10),
         hoverColor: AppColors.adminSidebarActive.withAlpha(184),
         child: Container(
-          height: itemHeight,
-          padding: const EdgeInsets.symmetric(horizontal: 8),
+          height: 52,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
             color: selected ? AppColors.adminSidebarActive : Colors.transparent,
             borderRadius: BorderRadius.circular(10),
           ),
           child: Row(
             children: [
+              // Left accent bar
               AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                width: 6,
-                height: itemHeight - 18,
+                width: 4,
+                height: 32,
                 decoration: BoxDecoration(
                   color: selected ? AppColors.adminAccent : Colors.transparent,
-                  borderRadius: const BorderRadius.horizontal(right: Radius.circular(6)),
+                  borderRadius: const BorderRadius.horizontal(
+                    right: Radius.circular(4),
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
+              // Icon container
               Container(
-                width: 44,
-                height: 44,
+                width: 40,
+                height: 40,
                 decoration: BoxDecoration(
-                  color: selected ? AppColors.adminAccent : AppColors.adminSidebarMuted.withAlpha(51),
+                  color: selected
+                      ? AppColors.adminAccent
+                      : AppColors.adminSidebarMuted.withAlpha(51),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(selected ? item.selectedIcon : item.icon, color: iconColor),
+                child: Icon(
+                  selected ? item.selectedIcon : item.icon,
+                  color: iconColor,
+                  size: iconSize,
+                ),
               ),
               const SizedBox(width: 12),
+              // Label - now with proper ellipsis and flex
               Expanded(
-                child: Tooltip(
-                  message: item.label,
-                  child: Text(
-                    item.label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: textColor,
-                      fontSize: fontSize,
-                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                    ),
+                child: Text(
+                  item.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  softWrap: false,
+                  style: TextStyle(
+                    color: textColor,
+                    fontSize: fontSize,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                   ),
                 ),
               ),
@@ -507,6 +667,32 @@ class _SystemAdminSidebarItem extends StatelessWidget {
   }
 }
 
+// Helper function
+String _initials(String fullName) {
+  final parts = fullName.trim().split(RegExp(r'\s+'));
+  if (parts.isEmpty || parts.first.isEmpty) return 'A';
+  if (parts.length == 1) return parts.first.substring(0, 1).toUpperCase();
+  return '${parts.first.substring(0, 1)}${parts[1].substring(0, 1)}'
+      .toUpperCase();
+}
+
+class _NavItem {
+  const _NavItem(
+    this.id,
+    this.label,
+    this.shortLabel,
+    this.icon,
+    this.selectedIcon,
+  );
+
+  final String id;
+  final String label;
+  final String shortLabel;
+  final IconData icon;
+  final IconData selectedIcon;
+}
+
+// Keep ActiveSchoolYearGate as is...
 class ActiveSchoolYearGate extends StatelessWidget {
   const ActiveSchoolYearGate({super.key, required this.child});
 
@@ -564,20 +750,4 @@ class ActiveSchoolYearGate extends StatelessWidget {
       },
     );
   }
-}
-
-class _NavItem {
-  const _NavItem(
-    this.id,
-    this.label,
-    this.shortLabel,
-    this.icon,
-    this.selectedIcon,
-  );
-
-  final String id;
-  final String label;
-  final String shortLabel;
-  final IconData icon;
-  final IconData selectedIcon;
 }

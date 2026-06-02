@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../constants/colors.dart';
 
@@ -77,10 +76,11 @@ class AppTheme {
     );
   }
 
-  static ThemeData systemAdmin(ThemeData base) {
-    final textTheme = GoogleFonts.outfitTextTheme(
-      base.textTheme,
-    ).apply(bodyColor: AppColors.adminText, displayColor: AppColors.adminText);
+  static ThemeData admin(ThemeData base) {
+    final textTheme = base.textTheme.apply(
+      bodyColor: AppColors.adminText,
+      displayColor: AppColors.adminText,
+    );
 
     return base.copyWith(
       scaffoldBackgroundColor: AppColors.adminBackground,
@@ -99,7 +99,7 @@ class AppTheme {
         shape: const Border(
           bottom: BorderSide(color: AppColors.adminBorder, width: 0.8),
         ),
-        titleTextStyle: GoogleFonts.poppins(
+        titleTextStyle: const TextStyle(
           color: AppColors.adminText,
           fontSize: 18,
           fontWeight: FontWeight.w600,
@@ -108,8 +108,8 @@ class AppTheme {
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: AppColors.adminSurface,
         indicatorColor: AppColors.adminAccent.withAlpha(31),
-        labelTextStyle: WidgetStatePropertyAll(
-          GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600),
+        labelTextStyle: const WidgetStatePropertyAll(
+          TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
         ),
       ),
       cardTheme: CardThemeData(
@@ -131,7 +131,7 @@ class AppTheme {
         style: FilledButton.styleFrom(
           backgroundColor: AppColors.adminAccent,
           foregroundColor: Colors.white,
-          textStyle: GoogleFonts.outfit(fontWeight: FontWeight.w700),
+          textStyle: const TextStyle(fontWeight: FontWeight.w700),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
           ),
@@ -144,7 +144,7 @@ class AppTheme {
           side: BorderSide(
             color: AppColors.adminAccent.withAlpha(140),
           ),
-          textStyle: GoogleFonts.outfit(fontWeight: FontWeight.w700),
+          textStyle: const TextStyle(fontWeight: FontWeight.w700),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
           ),
@@ -179,12 +179,12 @@ class AppTheme {
         ),
       ),
       dataTableTheme: DataTableThemeData(
-        headingTextStyle: GoogleFonts.outfit(
+        headingTextStyle: const TextStyle(
           color: AppColors.adminText,
           fontSize: 13,
           fontWeight: FontWeight.w700,
         ),
-        dataTextStyle: GoogleFonts.outfit(
+        dataTextStyle: const TextStyle(
           color: AppColors.adminText,
           fontSize: 13,
           fontWeight: FontWeight.w400,
@@ -202,7 +202,7 @@ class AppTheme {
         backgroundColor: AppColors.adminSurface,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        titleTextStyle: GoogleFonts.poppins(
+        titleTextStyle: const TextStyle(
           color: AppColors.adminText,
           fontSize: 20,
           fontWeight: FontWeight.w600,
