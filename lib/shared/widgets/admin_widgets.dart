@@ -12,6 +12,7 @@ class CollectionTable extends StatelessWidget {
     required this.columns,
     this.schoolYearScoped = false,
     this.search = '',
+    this.filters = const {},
     this.itemsPerPage = 10,
     this.onEdit,
   });
@@ -20,6 +21,7 @@ class CollectionTable extends StatelessWidget {
   final List<String> columns;
   final bool schoolYearScoped;
   final String search;
+  final Map<String, String> filters;
   final int itemsPerPage;
   final void Function(
     BuildContext context,
@@ -52,6 +54,7 @@ class CollectionTable extends StatelessWidget {
             initialItemsPerPage: itemsPerPage,
             schoolYearId: schoolYear.id,
             search: search,
+            filters: filters,
             onEdit: onEdit,
             onArchive: (docId) async {
               await app.repository
@@ -77,6 +80,7 @@ class CollectionTable extends StatelessWidget {
       columns: columns,
       stream: app.repository.rootCollection(collection).limit(200).snapshots(),
       search: search,
+      filters: filters,
       initialItemsPerPage: itemsPerPage,
       onEdit: onEdit,
       onArchive: (docId) =>
@@ -92,6 +96,7 @@ class _CollectionTableBody extends StatefulWidget {
     required this.stream,
     required this.onArchive,
     this.search = '',
+    this.filters = const {},
     required this.initialItemsPerPage,
     this.schoolYearId,
     this.onEdit,
@@ -102,6 +107,7 @@ class _CollectionTableBody extends StatefulWidget {
   final Stream<QuerySnapshot<Map<String, dynamic>>> stream;
   final Future<void> Function(String docId) onArchive;
   final String search;
+  final Map<String, String> filters;
   final int initialItemsPerPage;
   final String? schoolYearId;
   final void Function(
@@ -136,10 +142,11 @@ class _CollectionTableBodyState extends State<_CollectionTableBody> {
       builder: (context, snapshot) {
         final query = widget.search.trim().toLowerCase();
         final docs = (snapshot.data?.docs ?? []).where((doc) {
-          if (query.isEmpty) return true;
           final data = doc.data();
+          if (!_matchesFilters(data, widget.filters)) return false;
+          if (query.isEmpty) return true;
           return widget.columns
-              .map((column) => adminFormatValue(data[column]))
+              .map((column) => adminTableSearchValue(data, column))
               .join(' ')
               .toLowerCase()
               .contains(query);
@@ -176,7 +183,13 @@ class _CollectionTableBodyState extends State<_CollectionTableBody> {
                         dataRowMaxHeight: hasCountsColumn ? 132 : 44,
                         columns: [
                           for (final column in widget.columns)
-                            DataColumn(label: Text(adminLabel(column))),
+                            DataColumn(
+                              label: Text(
+                                column == 'fullName'
+                                    ? 'Full Name'
+                                    : adminLabel(column),
+                              ),
+                            ),
                           const DataColumn(label: Text('Actions')),
                         ],
                         rows: [
@@ -187,7 +200,9 @@ class _CollectionTableBodyState extends State<_CollectionTableBody> {
                                   DataCell(
                                     _buildCell(
                                       context,
-                                      doc.data()[column],
+                                      column == 'fullName'
+                                          ? adminPersonName(doc.data())
+                                          : doc.data()[column],
                                       column,
                                     ),
                                   ),
@@ -256,6 +271,16 @@ class _CollectionTableBodyState extends State<_CollectionTableBody> {
         );
       },
     );
+  }
+
+  bool _matchesFilters(Map<String, dynamic> data, Map<String, String> filters) {
+    for (final entry in filters.entries) {
+      final selected = entry.value.trim();
+      if (selected.isEmpty) continue;
+      final value = adminFormatValue(data[entry.key]).trim().toLowerCase();
+      if (value != selected.toLowerCase()) return false;
+    }
+    return true;
   }
 
   Widget _buildCell(BuildContext context, Object? value, String column) {
@@ -593,4 +618,20 @@ String adminFormatValue(Object? value) {
     return DateFormat('MMM d, yyyy').format(value.toDate());
   }
   return value.toString();
+}
+
+String adminTableSearchValue(Map<String, dynamic> data, String column) {
+  if (column == 'fullName') return adminPersonName(data);
+  return adminFormatValue(data[column]);
+}
+
+String adminPersonName(Map<String, dynamic> data) {
+  final lastName = (data['lastName'] as String? ?? '').trim();
+  final firstName = (data['firstName'] as String? ?? '').trim();
+  final middleName = (data['middleName'] as String? ?? '').trim();
+  final middleInitial = middleName.isEmpty ? '' : ' ${middleName[0]}.';
+  if (lastName.isEmpty && firstName.isEmpty) return '-';
+  if (lastName.isEmpty) return '$firstName$middleInitial';
+  if (firstName.isEmpty) return lastName;
+  return '$lastName, $firstName$middleInitial';
 }
