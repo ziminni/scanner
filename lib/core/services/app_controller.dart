@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../models/models.dart';
@@ -41,7 +42,9 @@ class AppController extends ChangeNotifier {
 
   Future<void> initialize() async {
     await offlineQueue.startNetworkWatcher();
-    firebaseAuth.setPersistence(Persistence.LOCAL);
+    if (kIsWeb) {
+      await firebaseAuth.setPersistence(Persistence.LOCAL);
+    }
     firebaseAuth.authStateChanges().listen((_) => refreshUser());
     await refreshUser();
   }
@@ -79,6 +82,24 @@ class AppController extends ChangeNotifier {
     currentUser = null;
     scheduleMicrotask(notifyListeners);
     unawaited(auth.logout(reason: 'unauthorized_route'));
+  }
+
+  void recordUnauthorizedAccess(String pageId, String location) {
+    final user = currentUser;
+    if (user == null) return;
+    unawaited(
+      audit.record(
+        action: 'unauthorized_access_attempt',
+        actorId: user.id,
+        actorName: user.fullName,
+        target: location,
+        metadata: {
+          'pageId': pageId,
+          'role': user.role.label,
+          'email': user.email,
+        },
+      ),
+    );
   }
 }
 

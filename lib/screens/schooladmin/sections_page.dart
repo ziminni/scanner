@@ -15,10 +15,23 @@ part 'widgets/detail_metric.dart';
 part 'widgets/card_line.dart';
 part 'widgets/adviser_dropdown.dart';
 
-class SectionsPage extends StatelessWidget {
+class SectionsPage extends StatefulWidget {
   const SectionsPage({super.key});
 
   static const _fields = ['name', 'gradeLevel', 'adviser', 'status'];
+
+  @override
+  State<SectionsPage> createState() => _SectionsPageState();
+}
+
+class _SectionsPageState extends State<SectionsPage> {
+  final _search = TextEditingController();
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -34,7 +47,24 @@ class SectionsPage extends StatelessWidget {
           ),
         ),
       ],
-      child: const _SectionsByGrade(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 360,
+            child: TextField(
+              controller: _search,
+              decoration: const InputDecoration(
+                prefixIcon: Icon(Icons.search),
+                labelText: 'Search section, grade, or adviser',
+              ),
+              onChanged: (_) => setState(() {}),
+            ),
+          ),
+          const SizedBox(height: 16),
+          _SectionsByGrade(search: _search.text),
+        ],
+      ),
     );
   }
 }

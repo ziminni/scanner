@@ -5,7 +5,10 @@ import '../core/services/app_controller.dart';
 import '../core/constants/enums.dart';
 import '../models/models.dart';
 import '../screens/auth/login_screen.dart';
+import '../screens/scanner/logs_page.dart';
+import '../screens/scanner/scanner_home_page.dart';
 import '../screens/scanner/scanner_screen.dart';
+import '../screens/scanner/settings_page.dart';
 import '../screens/schooladmin/archive_management_page.dart';
 import '../screens/schooladmin/attendance_logs_page.dart';
 import '../screens/schooladmin/attendance_status_page.dart';
@@ -45,7 +48,9 @@ class AppRoutes {
   static const attendanceStatus = 'attendanceStatus';
   static const earlyStudents = 'earlyStudents';
   static const reports = 'reports';
+  static const scannerHome = 'scannerHome';
   static const scanner = 'scanner';
+  static const scannerSettings = 'scannerSettings';
 
   static const loadingPath = '/loading';
   static const loginPath = '/login';
@@ -64,7 +69,9 @@ class AppRoutes {
   static const attendanceStatusPath = '/attendance-status';
   static const earlyStudentsPath = '/early-students';
   static const reportsPath = '/reports';
+  static const scannerHomePath = '/scanner-home';
   static const scannerPath = '/scanner';
+  static const scannerSettingsPath = '/scanner-settings';
 
   static GoRouter router(AppController app) {
     return GoRouter(
@@ -85,8 +92,8 @@ class AppRoutes {
         final pageId = pageIdFromPath(location);
         if (pageId == null) return defaultPathFor(user);
         if (!app.auth.canAccess(user, pageId)) {
-          app.logoutForUnauthorizedAccess();
-          return loginPath;
+          app.recordUnauthorizedAccess(pageId, location);
+          return defaultPathFor(user);
         }
         return null;
       },
@@ -116,7 +123,7 @@ class AppRoutes {
           name: dashboard,
           pageId: dashboard,
           builder: (context) {
-            final role = AppScope.of(context).currentUser!.role;
+            final role = app.currentUser!.role;
             return role == UserRole.systemAdministrator
                 ? const SystemAdminDashboardPage()
                 : const SchoolAdminDashboardPage();
@@ -151,7 +158,7 @@ class AppRoutes {
           name: archives,
           pageId: archives,
           builder: (context) {
-            final role = AppScope.of(context).currentUser!.role;
+            final role = app.currentUser!.role;
             return role == UserRole.systemAdministrator
                 ? const SystemArchiveManagementPage()
                 : const SchoolArchiveManagementPage();
@@ -191,7 +198,12 @@ class AppRoutes {
           path: logsPath,
           name: logs,
           pageId: logs,
-          builder: (_) => const AttendanceLogsPage(),
+          builder: (context) {
+            final role = app.currentUser!.role;
+            return role == UserRole.staffScanner
+                ? const ScannerLogsPage()
+                : const AttendanceLogsPage();
+          },
         ),
         _shellRoute(
           path: attendanceStatusPath,
@@ -212,10 +224,22 @@ class AppRoutes {
           builder: (_) => const ReportsExportPage(),
         ),
         _shellRoute(
+          path: scannerHomePath,
+          name: scannerHome,
+          pageId: scannerHome,
+          builder: (_) => const ScannerHomePage(),
+        ),
+        _shellRoute(
           path: scannerPath,
           name: scanner,
           pageId: scanner,
           builder: (_) => const ScannerScreen(),
+        ),
+        _shellRoute(
+          path: scannerSettingsPath,
+          name: scannerSettings,
+          pageId: scannerSettings,
+          builder: (_) => const ScannerSettingsPage(),
         ),
       ],
     );
@@ -230,14 +254,17 @@ class AppRoutes {
     return GoRoute(
       path: path,
       name: name,
-      pageBuilder: (context, state) => NoTransitionPage(
-        child: AppShell(
-          currentPage: pageId,
-          child: _requiresActiveSchoolYear(pageId)
-              ? ActiveSchoolYearGate(child: builder(context))
-              : builder(context),
-        ),
-      ),
+      pageBuilder: (context, state) {
+        final page = builder(context);
+        return NoTransitionPage(
+          child: AppShell(
+            currentPage: pageId,
+            child: _requiresActiveSchoolYear(pageId)
+                ? ActiveSchoolYearGate(child: page)
+                : page,
+          ),
+        );
+      },
     );
   }
 
@@ -247,7 +274,7 @@ class AppRoutes {
 
   static String defaultPageFor(AppUser user) {
     return switch (user.role.key) {
-      'staff_scanner' => scanner,
+      'staff_scanner' => scannerHome,
       _ => dashboard,
     };
   }
@@ -269,7 +296,9 @@ class AppRoutes {
       attendanceStatus => attendanceStatusPath,
       earlyStudents => earlyStudentsPath,
       reports => reportsPath,
+      scannerHome => scannerHomePath,
       scanner => scannerPath,
+      scannerSettings => scannerSettingsPath,
       _ => dashboardPath,
     };
   }
@@ -291,7 +320,9 @@ class AppRoutes {
       attendanceStatusPath => attendanceStatus,
       earlyStudentsPath => earlyStudents,
       reportsPath => reports,
+      scannerHomePath => scannerHome,
       scannerPath => scanner,
+      scannerSettingsPath => scannerSettings,
       _ => null,
     };
   }

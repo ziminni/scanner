@@ -1,10 +1,15 @@
 part of '../early_students_page.dart';
 
 class _LeaderboardTable extends StatefulWidget {
-  const _LeaderboardTable({required this.entries, required this.period});
+  const _LeaderboardTable({
+    required this.entries,
+    required this.period,
+    required this.selectedRole,
+  });
 
   final List<EarlyLeaderboardEntry> entries;
   final EarlyLeaderboardPeriod period;
+  final PersonRole selectedRole;
 
   @override
   State<_LeaderboardTable> createState() => _LeaderboardTableState();
@@ -20,7 +25,8 @@ class _LeaderboardTableState extends State<_LeaderboardTable> {
   void didUpdateWidget(covariant _LeaderboardTable oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.entries != widget.entries ||
-        oldWidget.period != widget.period) {
+        oldWidget.period != widget.period ||
+        oldWidget.selectedRole != widget.selectedRole) {
       _currentPage = 0;
     }
   }
@@ -44,7 +50,7 @@ class _LeaderboardTableState extends State<_LeaderboardTable> {
             child: DataTable(
               columns: [
                 const DataColumn(label: Text('Rank')),
-                const DataColumn(label: Text('Student ID')),
+                DataColumn(label: Text('${widget.selectedRole.label} ID')),
                 const DataColumn(label: Text('Full Name')),
                 const DataColumn(label: Text('Section')),
                 if (isDaily) const DataColumn(label: Text('Time In')),

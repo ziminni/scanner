@@ -11,6 +11,7 @@ class CollectionTable extends StatelessWidget {
     required this.collection,
     required this.columns,
     this.schoolYearScoped = false,
+    this.search = '',
     this.itemsPerPage = 10,
     this.onEdit,
   });
@@ -18,6 +19,7 @@ class CollectionTable extends StatelessWidget {
   final String collection;
   final List<String> columns;
   final bool schoolYearScoped;
+  final String search;
   final int itemsPerPage;
   final void Function(
     BuildContext context,
@@ -49,6 +51,7 @@ class CollectionTable extends StatelessWidget {
                 .snapshots(),
             initialItemsPerPage: itemsPerPage,
             schoolYearId: schoolYear.id,
+            search: search,
             onEdit: onEdit,
             onArchive: (docId) async {
               await app.repository
@@ -73,6 +76,7 @@ class CollectionTable extends StatelessWidget {
       collection: collection,
       columns: columns,
       stream: app.repository.rootCollection(collection).limit(200).snapshots(),
+      search: search,
       initialItemsPerPage: itemsPerPage,
       onEdit: onEdit,
       onArchive: (docId) =>
@@ -87,6 +91,7 @@ class _CollectionTableBody extends StatefulWidget {
     required this.columns,
     required this.stream,
     required this.onArchive,
+    this.search = '',
     required this.initialItemsPerPage,
     this.schoolYearId,
     this.onEdit,
@@ -96,6 +101,7 @@ class _CollectionTableBody extends StatefulWidget {
   final List<String> columns;
   final Stream<QuerySnapshot<Map<String, dynamic>>> stream;
   final Future<void> Function(String docId) onArchive;
+  final String search;
   final int initialItemsPerPage;
   final String? schoolYearId;
   final void Function(
@@ -128,7 +134,16 @@ class _CollectionTableBodyState extends State<_CollectionTableBody> {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: widget.stream,
       builder: (context, snapshot) {
-        final docs = snapshot.data?.docs ?? [];
+        final query = widget.search.trim().toLowerCase();
+        final docs = (snapshot.data?.docs ?? []).where((doc) {
+          if (query.isEmpty) return true;
+          final data = doc.data();
+          return widget.columns
+              .map((column) => adminFormatValue(data[column]))
+              .join(' ')
+              .toLowerCase()
+              .contains(query);
+        }).toList();
         if (docs.isEmpty) {
           return EmptyState(title: 'No ${widget.collection} records yet');
         }
@@ -253,8 +268,8 @@ class _CollectionTableBodyState extends State<_CollectionTableBody> {
       final type = label.toLowerCase().contains('late')
           ? 'late'
           : label.toLowerCase().contains('disabled')
-              ? 'disabled'
-              : 'active';
+          ? 'disabled'
+          : 'active';
       return StatusBadge(label: label, type: type);
     }
     if (value is Timestamp) return TimestampText(value);
@@ -274,11 +289,10 @@ class _CountsCell extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final screenWidth = MediaQuery.of(context).size.width;
-    final constrainedWidth = (screenWidth < 700
-            ? screenWidth * 0.58
-            : screenWidth * 0.32)
-        .clamp(200.0, 360.0)
-        .toDouble();
+    final constrainedWidth =
+        (screenWidth < 700 ? screenWidth * 0.58 : screenWidth * 0.32)
+            .clamp(200.0, 360.0)
+            .toDouble();
     final entries = counts.entries.toList()
       ..sort((a, b) => a.key.toString().compareTo(b.key.toString()));
     final visibleEntries = entries.take(_visibleCount).toList();
@@ -324,10 +338,7 @@ class _CountsCell extends StatelessWidget {
 }
 
 class _CountListItem extends StatelessWidget {
-  const _CountListItem({
-    required this.label,
-    required this.value,
-  });
+  const _CountListItem({required this.label, required this.value});
 
   final String label;
   final String value;
@@ -459,8 +470,9 @@ class AdminPaginationControls extends StatelessWidget {
         ),
         IconButton(
           icon: const Icon(Icons.chevron_left),
-          onPressed:
-              currentPage > 0 ? () => onPageChanged(currentPage - 1) : null,
+          onPressed: currentPage > 0
+              ? () => onPageChanged(currentPage - 1)
+              : null,
           tooltip: 'Previous page',
         ),
         Padding(
@@ -567,10 +579,9 @@ class DataSurface extends StatelessWidget {
 }
 
 String adminLabel(String key) {
-  final spaced = key.replaceAll('_', ' ').replaceAllMapped(
-    RegExp(r'([A-Z])'),
-    (match) => ' ${match.group(1)}',
-  );
+  final spaced = key
+      .replaceAll('_', ' ')
+      .replaceAllMapped(RegExp(r'([A-Z])'), (match) => ' ${match.group(1)}');
   return spaced[0].toUpperCase() + spaced.substring(1);
 }
 

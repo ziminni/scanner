@@ -7,6 +7,7 @@ class _LeaderboardSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final roleLabel = viewModel.selectedRole.label.toLowerCase();
     return DataSurface(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -16,11 +17,11 @@ class _LeaderboardSummary extends StatelessWidget {
           children: [
             _Metric(label: 'Period', value: viewModel.periodLabel),
             _Metric(
-              label: 'Students ranked',
+              label: '${viewModel.selectedRole.label}s ranked',
               value: '${viewModel.entries.length}',
             ),
             _Metric(
-              label: 'Top student',
+              label: 'Top $roleLabel',
               value: viewModel.entries.isEmpty
                   ? '-'
                   : viewModel.entries.first.fullName,

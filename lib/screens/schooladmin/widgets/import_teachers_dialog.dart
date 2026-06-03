@@ -28,33 +28,56 @@ class _ImportTeachersDialogState extends State<_ImportTeachersDialog> {
           title: const Text('Import teachers'),
           content: SizedBox(
             width: 520,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Spreadsheet columns: teacher id, last name, first name, middle name, birthdate, address, contact number, time in, time out.',
-                ),
-                const SizedBox(height: 16),
-                OutlinedButton.icon(
-                  icon: const Icon(Icons.attach_file_outlined),
-                  label: Text(_viewModel.fileName ?? 'Choose spreadsheet'),
-                  onPressed: _viewModel.busy ? null : _viewModel.pickFile,
-                ),
-                if (_viewModel.importedCount > 0) ...[
-                  const SizedBox(height: 12),
-                  Text('${_viewModel.importedCount} teachers imported.'),
-                ],
-                if (_viewModel.error != null) ...[
-                  const SizedBox(height: 12),
-                  Text(
-                    _viewModel.error!,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Spreadsheet columns: teacher id, last name, first name, middle name, birthdate, address, contact number, time in, time out.',
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 56,
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.attach_file_outlined),
+                      label: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          _viewModel.fileName ?? 'Choose spreadsheet',
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      onPressed: _viewModel.busy ? null : _viewModel.pickFile,
+                      style: OutlinedButton.styleFrom(
+                        alignment: Alignment.centerLeft,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
                     ),
                   ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Required file type: .xlsx',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  if (_viewModel.importedCount > 0) ...[
+                    const SizedBox(height: 12),
+                    Text('${_viewModel.importedCount} teachers imported.'),
+                  ],
+                  if (_viewModel.error != null) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      _viewModel.error!,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
           actions: [

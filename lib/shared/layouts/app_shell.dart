@@ -1,13 +1,15 @@
-// app_shell.dart - Refactored version
+import 'dart:async';
 
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/services/app_controller.dart';
+import '../../core/constants/colors.dart';
 import '../../core/constants/enums.dart';
+import '../../core/services/app_controller.dart';
 import '../../models/models.dart';
 import '../../routes/app_routes.dart';
-import '../../core/constants/colors.dart';
+import '../../screens/scanner/scanner_theme.dart';
 
 class AppShell extends StatelessWidget {
   const AppShell({super.key, required this.currentPage, required this.child});
@@ -28,10 +30,19 @@ class AppShell extends StatelessWidget {
         .indexWhere((item) => item.id == currentPage)
         .clamp(0, bottomItems.length - 1);
 
-    final isCompact = MediaQuery.sizeOf(context).width < 760;
+    if (user.role == UserRole.staffScanner) {
+      return _ScannerShell(
+        user: user,
+        items: items,
+        currentIndex: currentIndex,
+        bottomItems: bottomItems,
+        bottomIndex: bottomIndex,
+        child: child,
+      );
+    }
 
+    final isCompact = MediaQuery.sizeOf(context).width < 760;
     if (isCompact) {
-      // Mobile layout with bottom nav
       return Scaffold(
         appBar: AppBar(
           title: Text(user.role.label),
@@ -64,47 +75,16 @@ class AppShell extends StatelessWidget {
       );
     }
 
-    // Desktop layout: full-height sidebar + content area with integrated header
-    return Scaffold(
-      body: Row(
-        children: [
-          // Full-height sidebar
-          if (user.role == UserRole.systemAdministrator ||
-              user.role == UserRole.schoolAdministrator)
-            _AdminSidebar(
-              items: items,
-              currentIndex: currentIndex,
-              user: user,
-              onSelected: (index) =>
-                  context.go(AppRoutes.pathForPage(items[index].id)),
-            )
-          else
-            _StandardSidebar(
-              items: items,
-              currentIndex: currentIndex,
-              user: user,
-              onSelected: (index) =>
-                  context.go(AppRoutes.pathForPage(items[index].id)),
-            ),
-
-          // Content area with integrated header
-          Expanded(
-            child: Column(
-              children: [
-                // Integrated header (replaces AppBar)
-                _ContentHeader(user: user, onLogout: app.logout),
-                const Divider(height: 1, thickness: 1),
-                Expanded(child: child),
-              ],
-            ),
-          ),
-        ],
-      ),
+    return _AdminDesktopShell(
+      user: user,
+      items: items,
+      currentIndex: currentIndex,
+      onLogout: app.logout,
+      child: child,
     );
   }
 
   List<_NavItem> _itemsFor(UserRole role) {
-    // ... (keep your existing implementation)
     return switch (role) {
       UserRole.systemAdministrator => const [
         _NavItem(
@@ -144,8 +124,8 @@ class AppShell extends StatelessWidget {
         ),
         _NavItem(
           AppRoutes.archives,
-          'Completed School Years',
-          'History',
+          'Archives',
+          'Archives',
           Icons.archive_outlined,
           Icons.archive,
         ),
@@ -221,8 +201,22 @@ class AppShell extends StatelessWidget {
           Icons.file_download_outlined,
           Icons.file_download,
         ),
+        _NavItem(
+          AppRoutes.archives,
+          'Archives',
+          'Archives',
+          Icons.archive_outlined,
+          Icons.archive,
+        ),
       ],
       UserRole.staffScanner => const [
+        _NavItem(
+          AppRoutes.scannerHome,
+          'Home',
+          'Home',
+          Icons.home_outlined,
+          Icons.home,
+        ),
         _NavItem(
           AppRoutes.scanner,
           'Scan IDs',
@@ -242,64 +236,76 @@ class AppShell extends StatelessWidget {
   }
 }
 
-// New: Content Header (replaces AppBar)
-class _ContentHeader extends StatelessWidget {
-  const _ContentHeader({required this.user, required this.onLogout});
+class _AdminDesktopShell extends StatefulWidget {
+  const _AdminDesktopShell({
+    required this.user,
+    required this.items,
+    required this.currentIndex,
+    required this.onLogout,
+    required this.child,
+  });
 
   final AppUser user;
+  final List<_NavItem> items;
+  final int currentIndex;
   final VoidCallback onLogout;
+  final Widget child;
+
+  @override
+  State<_AdminDesktopShell> createState() => _AdminDesktopShellState();
+}
+
+class _AdminDesktopShellState extends State<_AdminDesktopShell> {
+  bool _sidebarCollapsed = false;
+  bool _sidebarContentCollapsed = false;
+  Timer? _sidebarContentTimer;
+
+  @override
+  void dispose() {
+    _sidebarContentTimer?.cancel();
+    super.dispose();
+  }
+
+  void _toggleSidebar() {
+    _sidebarContentTimer?.cancel();
+    if (_sidebarCollapsed) {
+      setState(() => _sidebarCollapsed = false);
+      _sidebarContentTimer = Timer(const Duration(milliseconds: 170), () {
+        if (!mounted) return;
+        setState(() => _sidebarContentCollapsed = false);
+      });
+      return;
+    }
+    setState(() {
+      _sidebarContentCollapsed = true;
+      _sidebarCollapsed = true;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 64,
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      decoration: BoxDecoration(
-        color: Theme.of(context).scaffoldBackgroundColor,
-        border: const Border(bottom: BorderSide(color: Colors.black12)),
-      ),
-      child: Row(
+    return Scaffold(
+      body: Row(
         children: [
-          // Page title could go here dynamically, or keep it simple
-          Text(
-            user.role.label,
-            style: Theme.of(
-              context,
-            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
+          _AdminSidebar(
+            items: widget.items,
+            currentIndex: widget.currentIndex,
+            collapsed: _sidebarCollapsed,
+            contentCollapsed: _sidebarContentCollapsed,
+            onSelected: (index) =>
+                context.go(AppRoutes.pathForPage(widget.items[index].id)),
           ),
-          const Spacer(),
-          // User info
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.grey.withAlpha(26),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
+          Expanded(
+            child: Column(
               children: [
-                CircleAvatar(radius: 16, child: Text(_initials(user.fullName))),
-                const SizedBox(width: 12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      user.fullName,
-                      style: const TextStyle(fontWeight: FontWeight.w500),
-                    ),
-                    Text(
-                      user.email,
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
+                _ContentHeader(
+                  user: widget.user,
+                  sidebarCollapsed: _sidebarCollapsed,
+                  onToggleSidebar: _toggleSidebar,
+                  onLogout: widget.onLogout,
                 ),
-                const SizedBox(width: 16),
-                IconButton(
-                  tooltip: 'Logout',
-                  icon: const Icon(Icons.logout),
-                  onPressed: onLogout,
-                ),
+                const Divider(height: 1, thickness: 1),
+                Expanded(child: widget.child),
               ],
             ),
           ),
@@ -309,30 +315,240 @@ class _ContentHeader extends StatelessWidget {
   }
 }
 
-// Unified Admin Sidebar - Full height with better responsive widths for system & school admins
+class _ContentHeader extends StatelessWidget {
+  const _ContentHeader({
+    required this.user,
+    required this.sidebarCollapsed,
+    required this.onToggleSidebar,
+    required this.onLogout,
+  });
+
+  final AppUser user;
+  final bool sidebarCollapsed;
+  final VoidCallback onToggleSidebar;
+  final VoidCallback onLogout;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 64,
+      padding: const EdgeInsets.fromLTRB(24, 0, 16, 0),
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        border: const Border(bottom: BorderSide(color: Colors.black12)),
+      ),
+      child: Row(
+        children: [
+          _HeaderSidebarToggleButton(
+            collapsed: sidebarCollapsed,
+            onPressed: onToggleSidebar,
+          ),
+          const SizedBox(width: 12),
+          Text(
+            user.role.label,
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
+          ),
+          const Spacer(),
+          _HeaderAccountMenu(user: user, onLogout: onLogout),
+        ],
+      ),
+    );
+  }
+}
+
+class _HeaderAccountMenu extends StatelessWidget {
+  const _HeaderAccountMenu({required this.user, required this.onLogout});
+
+  final AppUser user;
+  final VoidCallback onLogout;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return PopupMenuButton<_HeaderAccountAction>(
+      tooltip: 'Account menu',
+      position: PopupMenuPosition.under,
+      offset: const Offset(0, 8),
+      onSelected: (action) {
+        switch (action) {
+          case _HeaderAccountAction.profile:
+            showDialog<void>(
+              context: context,
+              builder: (_) => _HeaderProfileDialog(user: user),
+            );
+          case _HeaderAccountAction.logout:
+            onLogout();
+        }
+      },
+      itemBuilder: (context) => const [
+        PopupMenuItem(
+          value: _HeaderAccountAction.profile,
+          child: ListTile(
+            leading: Icon(Icons.person_outline),
+            title: Text('Profile'),
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
+        PopupMenuDivider(),
+        PopupMenuItem(
+          value: _HeaderAccountAction.logout,
+          child: ListTile(
+            leading: Icon(Icons.logout),
+            title: Text('Logout'),
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
+      ],
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border.all(color: theme.colorScheme.primary.withAlpha(28)),
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withAlpha(8),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircleAvatar(
+              radius: 20,
+              backgroundColor: theme.colorScheme.primary.withAlpha(38),
+              child: Text(
+                _initials(user.fullName),
+                style: TextStyle(
+                  color: theme.colorScheme.primary,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 220),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    user.fullName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  Text(
+                    user.email,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(Icons.keyboard_arrow_down, color: theme.colorScheme.primary),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+enum _HeaderAccountAction { profile, logout }
+
+class _HeaderProfileDialog extends StatelessWidget {
+  const _HeaderProfileDialog({required this.user});
+
+  final AppUser user;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Profile'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _HeaderProfileLine(label: 'Name', value: user.fullName),
+          _HeaderProfileLine(label: 'Email', value: user.email),
+          _HeaderProfileLine(label: 'Role', value: user.role.label),
+          _HeaderProfileLine(label: 'Status', value: user.status.label),
+        ],
+      ),
+      actions: [
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Close'),
+        ),
+      ],
+    );
+  }
+}
+
+class _HeaderProfileLine extends StatelessWidget {
+  const _HeaderProfileLine({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              color: theme.colorScheme.primary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(value.isEmpty ? '-' : value),
+        ],
+      ),
+    );
+  }
+}
+
 class _AdminSidebar extends StatelessWidget {
   const _AdminSidebar({
     required this.items,
     required this.currentIndex,
-    required this.user,
+    required this.collapsed,
+    required this.contentCollapsed,
     required this.onSelected,
   });
 
   final List<_NavItem> items;
   final int currentIndex;
-  final AppUser user;
+  final bool collapsed;
+  final bool contentCollapsed;
   final ValueChanged<int> onSelected;
 
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.sizeOf(context).width;
-    // Better responsive width: min 240px, max 280px, or 16% of screen
-    final sidebarWidth = (screenWidth * 0.16).clamp(240.0, 280.0);
-    final horizontalPadding = sidebarWidth >= 260 ? 16.0 : 12.0;
-    final verticalPadding = 20.0;
+    final expandedWidth = (screenWidth * 0.17).clamp(280.0, 320.0);
+    final sidebarWidth = collapsed ? 92.0 : expandedWidth;
+    final horizontalPadding = sidebarWidth >= 320 ? 22.0 : 18.0;
 
-    return Container(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
       width: sidebarWidth,
+      clipBehavior: Clip.hardEdge,
       decoration: BoxDecoration(
         color: AppColors.adminSidebar,
         border: const Border(right: BorderSide(color: AppColors.adminBorder)),
@@ -346,249 +562,141 @@ class _AdminSidebar extends StatelessWidget {
       ),
       child: Column(
         children: [
-          // Logo/Brand area at top (using school logo image)
           Container(
-            height: 64,
-            padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+            height: 88,
+            padding: EdgeInsets.symmetric(
+              horizontal: contentCollapsed ? 10 : horizontalPadding,
+            ),
             decoration: const BoxDecoration(
               border: Border(bottom: BorderSide(color: Colors.white10)),
             ),
-            child: Row(
-              children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                    image: const DecorationImage(
-                      image: AssetImage('assets/img/logo.jpg'),
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
+            child: contentCollapsed
+                ? const Center(child: _SidebarLogo(size: 46))
+                : Row(
                     children: [
-                      const Text(
-                        'ATTENDANCE',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 11,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                      Text(
-                        'School Monitor',
-                        style: TextStyle(
-                          color: AppColors.mint.withAlpha(200),
-                          fontSize: 10,
+                      const _SidebarLogo(size: 54),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Text(
+                              'LEON GARCIA',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 15,
+                              ),
+                            ),
+                            Text(
+                              'School Monitor',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: AppColors.mint.withAlpha(200),
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
-                ),
-              ],
-            ),
           ),
-          // Navigation items
           Expanded(
             child: ListView.separated(
-              padding: EdgeInsets.symmetric(vertical: verticalPadding),
+              padding: EdgeInsets.fromLTRB(
+                contentCollapsed ? 12 : horizontalPadding * 0.72,
+                22,
+                contentCollapsed ? 12 : horizontalPadding * 0.72,
+                22,
+              ),
               itemCount: items.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 4),
+              separatorBuilder: (_, _) => const SizedBox(height: 8),
               itemBuilder: (context, index) {
                 final item = items[index];
                 final selected = index == currentIndex;
                 return _AdminSidebarItem(
                   item: item,
                   selected: selected,
+                  collapsed: contentCollapsed,
                   onTap: () => onSelected(index),
                   sidebarWidth: sidebarWidth,
                 );
               },
             ),
           ),
-          // User profile card at bottom (now properly at bottom)
-          Container(
-            padding: EdgeInsets.all(horizontalPadding),
-            decoration: BoxDecoration(
-              color: AppColors.adminSidebarActive.withAlpha(184),
-              border: const Border(top: BorderSide(color: Colors.white10)),
-            ),
-            child: _UserProfileCard(user: user),
-          ),
         ],
       ),
     );
   }
 }
 
-// Standard Sidebar for non-admin users (using NavigationRail but full-height)
-class _StandardSidebar extends StatelessWidget {
-  const _StandardSidebar({
-    required this.items,
-    required this.currentIndex,
-    required this.user,
-    required this.onSelected,
+class _SidebarLogo extends StatelessWidget {
+  const _SidebarLogo({required this.size});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(size >= 50 ? 12 : 10),
+        image: const DecorationImage(
+          image: AssetImage('assets/img/logo.jpg'),
+          fit: BoxFit.cover,
+        ),
+      ),
+    );
+  }
+}
+
+class _HeaderSidebarToggleButton extends StatelessWidget {
+  const _HeaderSidebarToggleButton({
+    required this.collapsed,
+    required this.onPressed,
   });
 
-  final List<_NavItem> items;
-  final int currentIndex;
-  final AppUser user;
-  final ValueChanged<int> onSelected;
+  final bool collapsed;
+  final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.sizeOf(context).width;
-    const expandedWidth = 240.0;
-    final isExpanded = screenWidth > 1100;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).scaffoldBackgroundColor,
-        border: const Border(right: BorderSide(color: Colors.black12)),
-      ),
-      child: NavigationRail(
-        selectedIndex: currentIndex,
-        labelType: isExpanded
-            ? NavigationRailLabelType.none
-            : NavigationRailLabelType.all,
-        minWidth: 56,
-        groupAlignment: -0.9,
-        minExtendedWidth: expandedWidth,
-        extended: isExpanded,
-        leading: isExpanded ? const SizedBox(height: 64) : null,
-        trailing: isExpanded
-            ? Padding(
-                padding: const EdgeInsets.all(12),
-                child: _UserProfileCardCompact(user: user),
-              )
-            : Tooltip(
-                message: user.fullName,
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: CircleAvatar(
-                    radius: 18,
-                    child: Text(_initials(user.fullName)),
-                  ),
-                ),
-              ),
-        destinations: [
-          for (final item in items)
-            NavigationRailDestination(
-              icon: Icon(item.icon),
-              selectedIcon: Icon(item.selectedIcon),
-              label: Text(item.label),
-            ),
-        ],
-        onDestinationSelected: onSelected,
+    final theme = Theme.of(context);
+    return Tooltip(
+      message: collapsed ? 'Open sidebar' : 'Close sidebar',
+      child: IconButton(
+        onPressed: onPressed,
+        icon: Icon(collapsed ? Icons.menu_open : Icons.menu, size: 22),
+        style: IconButton.styleFrom(
+          foregroundColor: theme.colorScheme.primary,
+          backgroundColor: theme.colorScheme.primary.withAlpha(18),
+          hoverColor: theme.colorScheme.primary.withAlpha(30),
+          fixedSize: const Size(40, 40),
+        ),
       ),
     );
   }
 }
 
-// Reusable user profile card for sidebar bottom
-class _UserProfileCard extends StatelessWidget {
-  const _UserProfileCard({required this.user});
-
-  final AppUser user;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        CircleAvatar(
-          radius: 20,
-          backgroundColor: AppColors.adminAccent,
-          child: Text(
-            _initials(user.fullName),
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                user.role.label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13,
-                ),
-              ),
-              Text(
-                user.email,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Colors.white70, fontSize: 11),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// Compact version for collapsed sidebar
-class _UserProfileCardCompact extends StatelessWidget {
-  const _UserProfileCardCompact({required this.user});
-
-  final AppUser user;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        CircleAvatar(
-          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-          child: Text(_initials(user.fullName)),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          user.role.label,
-          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 4),
-        Text(
-          user.email,
-          style: const TextStyle(fontSize: 10),
-          textAlign: TextAlign.center,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-      ],
-    );
-  }
-}
-
-// Refactored Sidebar Item with better text handling
 class _AdminSidebarItem extends StatelessWidget {
   const _AdminSidebarItem({
     required this.item,
     required this.selected,
+    required this.collapsed,
     required this.onTap,
     required this.sidebarWidth,
   });
 
   final _NavItem item;
   final bool selected;
+  final bool collapsed;
   final VoidCallback onTap;
   final double sidebarWidth;
 
@@ -596,47 +704,35 @@ class _AdminSidebarItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final textColor = selected ? Colors.white : Colors.white.withAlpha(216);
     final iconColor = selected ? Colors.white : Colors.white.withAlpha(179);
-    // Dynamic font size based on available width
-    final fontSize = sidebarWidth >= 260 ? 14.0 : 13.0;
-    final iconSize = sidebarWidth >= 260 ? 24.0 : 22.0;
+    final fontSize = sidebarWidth >= 320 ? 15.0 : 14.0;
+    final iconSize = sidebarWidth >= 320 ? 24.0 : 22.0;
 
-    return Material(
+    final button = Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(12),
         hoverColor: AppColors.adminSidebarActive.withAlpha(184),
         child: Container(
-          height: 52,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
+          height: collapsed ? 56 : 58,
+          padding: EdgeInsets.symmetric(horizontal: collapsed ? 0 : 14),
           decoration: BoxDecoration(
             color: selected ? AppColors.adminSidebarActive : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
+            mainAxisAlignment: collapsed
+                ? MainAxisAlignment.center
+                : MainAxisAlignment.start,
             children: [
-              // Left accent bar
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                width: 4,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: selected ? AppColors.adminAccent : Colors.transparent,
-                  borderRadius: const BorderRadius.horizontal(
-                    right: Radius.circular(4),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              // Icon container
               Container(
-                width: 40,
-                height: 40,
+                width: collapsed ? 46 : 44,
+                height: collapsed ? 46 : 44,
                 decoration: BoxDecoration(
                   color: selected
                       ? AppColors.adminAccent
                       : AppColors.adminSidebarMuted.withAlpha(51),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(
                   selected ? item.selectedIcon : item.icon,
@@ -644,30 +740,409 @@ class _AdminSidebarItem extends StatelessWidget {
                   size: iconSize,
                 ),
               ),
-              const SizedBox(width: 12),
-              // Label - now with proper ellipsis and flex
-              Expanded(
-                child: Text(
-                  item.label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  softWrap: false,
-                  style: TextStyle(
-                    color: textColor,
-                    fontSize: fontSize,
-                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              if (!collapsed) ...[
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text(
+                    item.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    softWrap: false,
+                    style: TextStyle(
+                      color: textColor,
+                      fontSize: fontSize,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                    ),
                   ),
                 ),
-              ),
+              ],
             ],
           ),
+        ),
+      ),
+    );
+
+    return collapsed ? Tooltip(message: item.label, child: button) : button;
+  }
+}
+
+class _ScannerShell extends StatelessWidget {
+  const _ScannerShell({
+    required this.user,
+    required this.items,
+    required this.currentIndex,
+    required this.bottomItems,
+    required this.bottomIndex,
+    required this.child,
+  });
+
+  final AppUser user;
+  final List<_NavItem> items;
+  final int currentIndex;
+  final List<_NavItem> bottomItems;
+  final int bottomIndex;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: ScannerTheme.background,
+      appBar: AppBar(
+        titleSpacing: 12,
+        backgroundColor: ScannerTheme.surfaceSoft,
+        foregroundColor: ScannerTheme.text,
+        title: const _ScannerHeaderTitle(),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: Builder(
+              builder: (context) => IconButton(
+                tooltip: 'Menu',
+                icon: const Icon(Icons.menu),
+                onPressed: () => Scaffold.of(context).openEndDrawer(),
+              ),
+            ),
+          ),
+        ],
+      ),
+      endDrawer: _ScannerAccountDrawer(user: user),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 760;
+          final extended = constraints.maxWidth > 1100;
+          if (compact) return child;
+          return Row(
+            children: [
+              ColoredBox(
+                color: ScannerTheme.surfaceSoft,
+                child: _ScannerNavigationRail(
+                  items: items,
+                  currentIndex: currentIndex,
+                  extended: extended,
+                ),
+              ),
+              const VerticalDivider(width: 1),
+              Expanded(child: child),
+            ],
+          );
+        },
+      ),
+      bottomNavigationBar: MediaQuery.sizeOf(context).width >= 760
+          ? null
+          : NavigationBar(
+              backgroundColor: ScannerTheme.surfaceSoft,
+              indicatorColor: ScannerTheme.primarySoft,
+              selectedIndex: bottomIndex,
+              onDestinationSelected: (index) =>
+                  context.go(AppRoutes.pathForPage(bottomItems[index].id)),
+              destinations: [
+                for (final item in bottomItems)
+                  NavigationDestination(
+                    icon: Icon(item.icon),
+                    selectedIcon: Icon(item.selectedIcon),
+                    label: item.shortLabel,
+                  ),
+              ],
+            ),
+    );
+  }
+}
+
+class _ScannerAccountDrawer extends StatelessWidget {
+  const _ScannerAccountDrawer({required this.user});
+
+  final AppUser user;
+
+  @override
+  Widget build(BuildContext context) {
+    final app = AppScope.of(context);
+    return Drawer(
+      width: 280,
+      backgroundColor: ScannerTheme.background,
+      child: SafeArea(
+        child: Column(
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(18),
+              decoration: const BoxDecoration(color: ScannerTheme.surfaceSoft),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      ClipOval(
+                        child: Image.asset(
+                          'assets/images/school_logo.jpeg',
+                          width: 52,
+                          height: 52,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          'Leon Garcia National Highschool',
+                          style: TextStyle(
+                            color: ScannerTheme.text,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  const Padding(
+                    padding: EdgeInsets.only(left: 64),
+                    child: Text(
+                      'Scanner',
+                      style: TextStyle(
+                        color: ScannerTheme.primary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            ListTile(
+              leading: const Icon(Icons.person_outline),
+              title: const Text('Profile'),
+              onTap: () {
+                Navigator.of(context).pop();
+                showDialog<void>(
+                  context: context,
+                  builder: (_) => _ScannerProfileDialog(user: user),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.settings_outlined),
+              title: const Text('Settings'),
+              onTap: () {
+                Navigator.of(context).pop();
+                context.go(AppRoutes.scannerSettingsPath);
+              },
+            ),
+            const Spacer(),
+            const Divider(height: 1),
+            ListTile(
+              leading: const Icon(Icons.logout, color: Colors.red),
+              title: const Text('Logout'),
+              onTap: () async {
+                final confirmed = await showDialog<bool>(
+                  context: context,
+                  builder: (_) => const _ScannerLogoutDialog(),
+                );
+                if (confirmed != true || !context.mounted) return;
+                Navigator.of(context).pop();
+                await app.logout();
+              },
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-// Helper function
+class _ScannerProfileDialog extends StatelessWidget {
+  const _ScannerProfileDialog({required this.user});
+
+  final AppUser user;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Profile'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _ProfileLine(label: 'Name', value: user.fullName),
+          _ProfileLine(label: 'Email', value: user.email),
+          _ProfileLine(label: 'Role', value: user.role.label),
+          _ProfileLine(label: 'Status', value: user.status.label),
+        ],
+      ),
+      actions: [
+        FilledButton(
+          style: FilledButton.styleFrom(
+            backgroundColor: ScannerTheme.primary,
+            foregroundColor: Colors.white,
+          ),
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Close'),
+        ),
+      ],
+    );
+  }
+}
+
+class _ProfileLine extends StatelessWidget {
+  const _ProfileLine({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              color: ScannerTheme.primary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(value.isEmpty ? '-' : value),
+        ],
+      ),
+    );
+  }
+}
+
+class _ScannerLogoutDialog extends StatelessWidget {
+  const _ScannerLogoutDialog();
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Logout'),
+      content: const Text('Are you sure you want to logout?'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(
+            backgroundColor: ScannerTheme.primary,
+            foregroundColor: Colors.white,
+          ),
+          onPressed: () => Navigator.of(context).pop(true),
+          child: const Text('Logout'),
+        ),
+      ],
+    );
+  }
+}
+
+class _ScannerNavigationRail extends StatelessWidget {
+  const _ScannerNavigationRail({
+    required this.items,
+    required this.currentIndex,
+    required this.extended,
+  });
+
+  final List<_NavItem> items;
+  final int currentIndex;
+  final bool extended;
+
+  @override
+  Widget build(BuildContext context) {
+    return NavigationRail(
+      backgroundColor: ScannerTheme.surfaceSoft,
+      selectedIndex: currentIndex,
+      selectedIconTheme: const IconThemeData(color: ScannerTheme.primary),
+      selectedLabelTextStyle: const TextStyle(color: ScannerTheme.primary),
+      indicatorColor: ScannerTheme.primarySoft,
+      labelType: extended
+          ? NavigationRailLabelType.none
+          : NavigationRailLabelType.all,
+      minExtendedWidth: 220,
+      extended: extended,
+      destinations: [
+        for (final item in items)
+          NavigationRailDestination(
+            icon: Icon(item.icon),
+            selectedIcon: Icon(item.selectedIcon),
+            label: Text(item.label),
+          ),
+      ],
+      onDestinationSelected: (index) =>
+          context.go(AppRoutes.pathForPage(items[index].id)),
+    );
+  }
+}
+
+class _ScannerHeaderTitle extends StatefulWidget {
+  const _ScannerHeaderTitle();
+
+  @override
+  State<_ScannerHeaderTitle> createState() => _ScannerHeaderTitleState();
+}
+
+class _ScannerHeaderTitleState extends State<_ScannerHeaderTitle> {
+  final Connectivity _connectivity = Connectivity();
+  StreamSubscription<List<ConnectivityResult>>? _subscription;
+  bool _isOnline = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStatus();
+    _subscription = _connectivity.onConnectivityChanged.listen(_setStatus);
+  }
+
+  Future<void> _loadStatus() async {
+    _setStatus(await _connectivity.checkConnectivity());
+  }
+
+  void _setStatus(List<ConnectivityResult> result) {
+    if (!mounted) return;
+    setState(() {
+      _isOnline = result.any((status) => status != ConnectivityResult.none);
+    });
+  }
+
+  @override
+  void dispose() {
+    _subscription?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ClipOval(
+          child: Image.asset(
+            'assets/images/school_logo.jpeg',
+            width: 36,
+            height: 36,
+            fit: BoxFit.cover,
+          ),
+        ),
+        const SizedBox(width: 10),
+        const Flexible(
+          child: Text('Leon Garcia', overflow: TextOverflow.ellipsis),
+        ),
+        const SizedBox(width: 8),
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(
+            color: _isOnline ? const Color(0xFF2E7D4F) : Colors.grey,
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white, width: 1.5),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 String _initials(String fullName) {
   final parts = fullName.trim().split(RegExp(r'\s+'));
   if (parts.isEmpty || parts.first.isEmpty) return 'A';
@@ -692,7 +1167,6 @@ class _NavItem {
   final IconData selectedIcon;
 }
 
-// Keep ActiveSchoolYearGate as is...
 class ActiveSchoolYearGate extends StatelessWidget {
   const ActiveSchoolYearGate({super.key, required this.child});
 

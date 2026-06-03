@@ -18,7 +18,14 @@ class _SectionCard extends StatelessWidget {
     final theme = Theme.of(context);
     final name = data['name'] as String? ?? 'Untitled section';
     final adviser = data['adviser'] as String? ?? '';
+    final adviserText = _formatAdviserName(adviser);
     final gradeLevel = data['gradeLevel'] as String? ?? '';
+    final gradeText = gradeLevel.trim().isEmpty
+        ? '-'
+        : gradeLevel.trim().toLowerCase().startsWith('grade')
+        ? gradeLevel
+        : 'Grade $gradeLevel';
+    final app = AppScope.of(context);
 
     return SizedBox(
       width: 260,
@@ -91,14 +98,39 @@ class _SectionCard extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 8),
-                _CardLine(
-                  icon: Icons.school_outlined,
-                  value: gradeLevel.isEmpty ? '-' : gradeLevel,
-                ),
+                _CardLine(icon: Icons.school_outlined, value: gradeText),
                 const SizedBox(height: 6),
                 _CardLine(
                   icon: Icons.person_outline,
-                  value: adviser.isEmpty ? 'No adviser' : adviser,
+                  value: adviserText.isEmpty ? 'No adviser' : adviserText,
+                ),
+                const SizedBox(height: 6),
+                FutureBuilder(
+                  future: app.attendance.activeSchoolYear(),
+                  builder: (context, schoolYearSnapshot) {
+                    final schoolYear = schoolYearSnapshot.data;
+                    if (schoolYear == null || name.trim().isEmpty) {
+                      return const _CardLine(
+                        icon: Icons.groups_outlined,
+                        value: '0 students',
+                      );
+                    }
+
+                    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                      stream: app.repository.studentsBySectionStream(
+                        schoolYearId: schoolYear.id,
+                        sectionName: name,
+                      ),
+                      builder: (context, snapshot) {
+                        final count = snapshot.data?.docs.length ?? 0;
+                        return _CardLine(
+                          icon: Icons.groups_outlined,
+                          value:
+                              '$count ${count == 1 ? 'student' : 'students'}',
+                        );
+                      },
+                    );
+                  },
                 ),
               ],
             ),
@@ -106,6 +138,32 @@ class _SectionCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _formatAdviserName(String value) {
+    final raw = value.trim();
+    if (raw.isEmpty) return '';
+    final commaParts = raw
+        .split(',')
+        .map((part) => part.trim())
+        .where((part) => part.isNotEmpty)
+        .toList();
+    if (commaParts.length >= 2) {
+      final lastName = commaParts[0];
+      final firstName = commaParts[1];
+      final middleName = commaParts.length >= 3 ? commaParts[2] : '';
+      final middleInitial = middleName.isEmpty ? '' : ' ${middleName[0]}.';
+      return '$lastName, $firstName$middleInitial';
+    }
+
+    final parts = raw.split(RegExp(r'\s+'));
+    if (parts.length >= 2) {
+      final lastName = parts.last;
+      final firstName = parts.first;
+      final middleInitial = parts.length >= 3 ? ' ${parts[1][0]}.' : '';
+      return '$lastName, $firstName$middleInitial';
+    }
+    return raw;
   }
 }
 

@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 import '../../core/services/app_controller.dart';
 import '../../shared/widgets/app_widgets.dart';
@@ -12,5 +13,5 @@ class AuditLogsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) =>
-      const AdminPage(title: 'Audit Logs', child: AuditLogsList(limit: 100));
+      const AdminPage(title: 'Audit Logs', child: AuditLogsList(limit: 500));
 }

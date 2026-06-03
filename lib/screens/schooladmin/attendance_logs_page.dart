@@ -21,21 +21,46 @@ class _AttendanceLogsPageState extends State<AttendanceLogsPage> {
 
   @override
   Widget build(BuildContext context) {
-    return AdminPage(
-      title: 'Attendance Logs',
-      child: Column(
-        children: [
-          TextField(
-            controller: _search,
-            decoration: const InputDecoration(
-              prefixIcon: Icon(Icons.search),
-              labelText: 'Search name, ID, section, scanner',
+    return DefaultTabController(
+      length: 2,
+      child: AdminPage(
+        title: 'Logs',
+        child: Column(
+          children: [
+            TextField(
+              controller: _search,
+              decoration: const InputDecoration(
+                prefixIcon: Icon(Icons.search),
+                labelText: 'Search name, ID, section, scanner, reason',
+              ),
+              onChanged: (_) => setState(() {}),
             ),
-            onChanged: (_) => setState(() {}),
-          ),
-          const SizedBox(height: 12),
-          AttendanceLogsTable(limit: 200, search: _search.text),
-        ],
+            const SizedBox(height: 12),
+            const TabBar(
+              tabs: [
+                Tab(text: 'Attendance Logs'),
+                Tab(text: 'Gate Pass Logs'),
+              ],
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: MediaQuery.sizeOf(context).height - 260,
+              child: TabBarView(
+                children: [
+                  SingleChildScrollView(
+                    child: AttendanceLogsTable(
+                      limit: 200,
+                      search: _search.text,
+                    ),
+                  ),
+                  SingleChildScrollView(
+                    child: GatePassLogsTable(limit: 200, search: _search.text),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

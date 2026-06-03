@@ -8,36 +8,120 @@ class ScannerViewModel extends BaseViewModel {
 
   final AppController _app;
 
+  ScannerLogMode mode = ScannerLogMode.attendance;
   AttendanceType type = AttendanceType.timeIn;
+  GatePassAction gatePassAction = GatePassAction.logOut;
+  TeacherBusinessType teacherBusinessType = TeacherBusinessType.personal;
+  bool expectedToReturn = true;
   AttendanceLog? lastLog;
+  GatePassLog? lastGatePassLog;
   String? message;
   String? _lastScannedCode;
   DateTime? _lastScannedAt;
+  SystemSettings _settings = const SystemSettings();
 
-  void selectType(AttendanceType nextType) {
-    type = nextType;
-    _lastScannedCode = null;
-    _lastScannedAt = null;
+  SystemSettings get settings => _settings;
+
+  Future<void> loadSettings() async {
+    _settings = await _app.attendance.loadSettings();
     notifyListeners();
   }
 
-  Future<void> submit(String raw) async {
+  void selectMode(ScannerLogMode nextMode) {
+    mode = nextMode;
+    lastLog = null;
+    lastGatePassLog = null;
+    _resetDetectionBuffer();
+    notifyListeners();
+  }
+
+  void selectType(AttendanceType nextType) {
+    type = nextType;
+    _resetDetectionBuffer();
+    notifyListeners();
+  }
+
+  void selectGatePassAction(GatePassAction action) {
+    gatePassAction = action;
+    _resetDetectionBuffer();
+    notifyListeners();
+  }
+
+  void selectTeacherBusinessType(TeacherBusinessType type) {
+    teacherBusinessType = type;
+    notifyListeners();
+  }
+
+  void setExpectedToReturn(bool value) {
+    expectedToReturn = value;
+    notifyListeners();
+  }
+
+  Future<void> validateGatePassLogOut(String scannedId) {
+    return _app.attendance.validateGatePassExitAllowed(scannedId);
+  }
+
+  void clearResult() {
+    lastLog = null;
+    lastGatePassLog = null;
+    message = null;
+    notifyListeners();
+  }
+
+  Future<void> submit(
+    String raw, {
+    String reason = '',
+    TeacherBusinessType? gatePassBusinessType,
+    bool? gatePassExpectedToReturn,
+  }) async {
     final id = raw.trim();
     if (id.isEmpty) return;
     setBusy(true);
     message = null;
+    lastLog = null;
+    lastGatePassLog = null;
     notifyListeners();
     try {
-      final log = await _app.attendance.scanId(
-        scannedId: id,
-        type: type,
-        scanner: _app.currentUser!,
-        deviceId: 'device-${_app.currentUser!.id}',
-      );
-      lastLog = log;
-      message = log.attendanceStatus == AttendanceStatus.duplicate
-          ? 'Duplicate scan ignored for this attendance type today.'
-          : '${log.fullName} logged as ${log.attendanceType.label}.';
+      if (mode == ScannerLogMode.attendance) {
+        final log = await _app.attendance.scanId(
+          scannedId: id,
+          type: type,
+          scanner: _app.currentUser!,
+          deviceId: 'device-${_app.currentUser!.id}',
+        );
+        lastLog = log;
+        lastGatePassLog = null;
+        message = log.attendanceStatus == AttendanceStatus.duplicate
+            ? 'Duplicate scan ignored for this attendance type today.'
+            : '${log.fullName} logged as ${log.attendanceType.label}.';
+      } else {
+        if (gatePassBusinessType != null) {
+          teacherBusinessType = gatePassBusinessType;
+        }
+        if (gatePassExpectedToReturn != null) {
+          expectedToReturn = gatePassExpectedToReturn;
+        }
+        final log = gatePassAction == GatePassAction.logOut
+            ? await _app.attendance.logGatePassExit(
+                scannedId: id,
+                reason: reason,
+                teacherBusinessType:
+                    gatePassBusinessType ?? teacherBusinessType,
+                expectedToReturn: gatePassExpectedToReturn ?? expectedToReturn,
+                scanner: _app.currentUser!,
+                deviceId: 'device-${_app.currentUser!.id}',
+              )
+            : await _app.attendance.logGatePassReturn(
+                scannedId: id,
+                scanner: _app.currentUser!,
+                deviceId: 'device-${_app.currentUser!.id}',
+              );
+        lastGatePassLog = log;
+        lastLog = null;
+        message = gatePassAction == GatePassAction.logOut
+            ? '${log.fullName} logged out for gate pass.'
+            : '${log.fullName} logged back in after ${log.durationMinutes} minutes.';
+      }
     } catch (error) {
       message = error.toString();
     } finally {
@@ -50,10 +134,24 @@ class ScannerViewModel extends BaseViewModel {
     final recentlyScannedSameCode =
         code == _lastScannedCode &&
         _lastScannedAt != null &&
-        now.difference(_lastScannedAt!) < const Duration(seconds: 2);
+        now.difference(_lastScannedAt!) <
+            Duration(seconds: _settings.scannerDetectionCooldownSeconds);
     if (busy || recentlyScannedSameCode) return false;
     _lastScannedCode = code;
     _lastScannedAt = now;
     return true;
+  }
+
+  int wordCount(String value) {
+    return value
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((word) => word.isNotEmpty)
+        .length;
+  }
+
+  void _resetDetectionBuffer() {
+    _lastScannedCode = null;
+    _lastScannedAt = null;
   }
 }

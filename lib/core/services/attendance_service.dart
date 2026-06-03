@@ -11,7 +11,10 @@ import 'offline_queue_service.dart';
 
 class AttendanceService {
   AttendanceService(this._firestore, this._queue, this._audit) {
-    _queue.syncRequests.listen((_) => syncPendingLogs());
+    _queue.syncRequests.listen((_) {
+      unawaited(syncPendingLogs());
+      unawaited(syncPendingGatePassLogs());
+    });
   }
 
   final FirebaseFirestore _firestore;
@@ -28,6 +31,22 @@ class AttendanceService {
           .collection('school_years')
           .doc(schoolYear.id)
           .collection('attendance_logs')
+          .orderBy('timestamp', descending: true)
+          .limit(limit)
+          .snapshots();
+    })();
+  }
+
+  Stream<QuerySnapshot<Map<String, dynamic>>> gatePassLogsStream({
+    int limit = 200,
+  }) {
+    return (() async* {
+      final schoolYear = await activeSchoolYear();
+      if (schoolYear == null) return;
+      yield* _firestore
+          .collection('school_years')
+          .doc(schoolYear.id)
+          .collection('gate_pass_logs')
           .orderBy('timestamp', descending: true)
           .limit(limit)
           .snapshots();
@@ -152,49 +171,225 @@ class AttendanceService {
     );
 
     if (!online) {
-      await _queue.enqueue(log);
+      if (await _queue.hasPendingDuplicate(
+        log,
+        duplicateWindowMinutes: settings.duplicateWindowMinutes,
+      )) {
+        return _duplicateLog(log, syncStatus: SyncStatus.pendingSync);
+      }
+      await _queue.enqueue(
+        log,
+        duplicateWindowMinutes: settings.duplicateWindowMinutes,
+      );
       return log;
     }
 
-    final duplicate = await _isDuplicate(log);
+    final duplicate = await _isDuplicate(
+      log,
+      duplicateWindowMinutes: settings.duplicateWindowMinutes,
+    );
     if (duplicate) {
-      return AttendanceLog(
-        id: log.id,
-        personId: log.personId,
-        fullName: log.fullName,
-        personRole: log.personRole,
-        section: log.section,
-        dateKey: log.dateKey,
-        timeText: log.timeText,
-        attendanceType: log.attendanceType,
-        attendanceStatus: AttendanceStatus.duplicate,
-        scannedBy: log.scannedBy,
-        scannerUserId: log.scannerUserId,
-        deviceId: log.deviceId,
-        offline: log.offline,
-        syncStatus: SyncStatus.synced,
-        timestamp: log.timestamp,
-        schoolYearId: log.schoolYearId,
-        schoolYear: log.schoolYear,
-        activeTerm: log.activeTerm,
-      );
+      return _duplicateLog(log, syncStatus: SyncStatus.synced);
     }
 
     await _writeLog(log);
     return log;
   }
 
+  Future<GatePassLog> logGatePassExit({
+    required String scannedId,
+    required String reason,
+    required TeacherBusinessType teacherBusinessType,
+    required bool expectedToReturn,
+    required AppUser scanner,
+    required String deviceId,
+  }) async {
+    final trimmedReason = reason.trim();
+    if (trimmedReason.isEmpty) {
+      throw StateError('Please enter the reason for going outside.');
+    }
+    final settings = await loadSettings();
+    if (_wordCount(trimmedReason) > settings.gatePassReasonWordLimit) {
+      throw StateError(
+        'Reason is too long. Please keep it within ${settings.gatePassReasonWordLimit} words.',
+      );
+    }
+
+    await validateGatePassExitAllowed(scannedId);
+
+    final now = DateTime.now();
+    final schoolYear = await activeSchoolYear();
+    if (schoolYear == null) {
+      throw StateError(
+        'Gate pass logging is disabled because there is no active school year.',
+      );
+    }
+
+    final online = await _queue.isOnline;
+    final person = await _findPerson(scannedId, schoolYear.id, online: online);
+    if (person == null) {
+      throw StateError('No active student or teacher found for ID $scannedId.');
+    }
+    final log = GatePassLog(
+      id: _uuid.v4(),
+      personId: scannedId,
+      fullName: person.fullName,
+      personRole: person.role,
+      section: person.section,
+      dateKey: DateFormat('yyyy-MM-dd').format(now),
+      exitTime: now,
+      exitTimeText: DateFormat('hh:mm a').format(now),
+      returnTime: null,
+      returnTimeText: '',
+      reason: trimmedReason,
+      teacherBusinessType: person.role == PersonRole.teacher
+          ? teacherBusinessType
+          : null,
+      expectedToReturn: expectedToReturn,
+      status: expectedToReturn
+          ? GatePassStatus.outside
+          : GatePassStatus.noReturn,
+      durationMinutes: 0,
+      scannedBy: scanner.fullName,
+      scannerUserId: scanner.id,
+      deviceId: deviceId,
+      offline: !online,
+      syncStatus: online ? SyncStatus.synced : SyncStatus.pendingSync,
+      timestamp: now,
+      updatedAt: now,
+      schoolYearId: schoolYear.id,
+      schoolYear: schoolYear.name,
+      activeTerm: schoolYear.activeTermName(now),
+    );
+
+    if (!online) {
+      await _queue.enqueueGatePass(log);
+      return log;
+    }
+
+    await _writeGatePassLog(log);
+    return log;
+  }
+
+  Future<void> validateGatePassExitAllowed(String scannedId) async {
+    final schoolYear = await activeSchoolYear();
+    if (schoolYear == null) {
+      throw StateError(
+        'Gate pass logging is disabled because there is no active school year.',
+      );
+    }
+
+    final online = await _queue.isOnline;
+    final person = await _findPerson(scannedId, schoolYear.id, online: online);
+    if (person == null) {
+      throw StateError('No active student or teacher found for ID $scannedId.');
+    }
+    final existingGatePass = await _findUnclosedGatePass(
+      schoolYearId: schoolYear.id,
+      personId: scannedId,
+      online: online,
+    );
+    if (existingGatePass != null) {
+      throw StateError(
+        '${person.fullName} already has an active gate pass log out. Log back in first before creating another gate pass log out.',
+      );
+    }
+  }
+
+  Future<GatePassLog> logGatePassReturn({
+    required String scannedId,
+    required AppUser scanner,
+    required String deviceId,
+  }) async {
+    final now = DateTime.now();
+    final schoolYear = await activeSchoolYear();
+    if (schoolYear == null) {
+      throw StateError(
+        'Gate pass logging is disabled because there is no active school year.',
+      );
+    }
+
+    final online = await _queue.isOnline;
+    final person = await _findPerson(scannedId, schoolYear.id, online: online);
+    if (person == null) {
+      throw StateError('No active student or teacher found for ID $scannedId.');
+    }
+
+    if (!online) {
+      final pending = await _queue.findPendingOpenGatePass(
+        schoolYearId: schoolYear.id,
+        personId: scannedId,
+      );
+      if (pending == null) {
+        throw StateError(
+          'No pending gate pass exit was found on this device. Reconnect to log a return from an online record.',
+        );
+      }
+      final updated = _returnedGatePassLog(pending, now, offline: true);
+      await _queue.updatePendingGatePass(updated);
+      return updated;
+    }
+
+    final openQuery = await _firestore
+        .collection('school_years')
+        .doc(schoolYear.id)
+        .collection('gate_pass_logs')
+        .where('personId', isEqualTo: scannedId)
+        .where('status', isEqualTo: GatePassStatus.outside.name)
+        .get();
+
+    if (openQuery.docs.isEmpty) {
+      throw StateError('No open gate pass exit found for ${person.fullName}.');
+    }
+
+    final openLogs = openQuery.docs.map(GatePassLog.fromDoc).toList()
+      ..sort((a, b) => b.exitTime.compareTo(a.exitTime));
+    final log = openLogs.first;
+    final updated = _returnedGatePassLog(log, now, offline: false);
+    await _firestore
+        .collection('school_years')
+        .doc(schoolYear.id)
+        .collection('gate_pass_logs')
+        .doc(log.id)
+        .set(updated.toMap(), SetOptions(merge: true));
+    await _audit.record(
+      action: 'gate_pass_return_logged',
+      actorId: scanner.id,
+      actorName: scanner.fullName,
+      target: updated.fullName,
+      metadata: {'durationMinutes': updated.durationMinutes},
+    );
+    return updated;
+  }
+
   Future<void> syncPendingLogs() async {
     if (!await _queue.isOnline) return;
+    final settings = await loadSettings();
     final pending = await _queue.loadPendingLogs();
     for (final log in pending) {
       try {
-        if (!await _isDuplicate(log)) {
+        if (!await _isDuplicate(
+          log,
+          duplicateWindowMinutes: settings.duplicateWindowMinutes,
+        )) {
           await _writeLog(log);
         }
         await _queue.remove(log.id);
       } catch (_) {
         await _queue.markFailed(log.id);
+      }
+    }
+  }
+
+  Future<void> syncPendingGatePassLogs() async {
+    if (!await _queue.isOnline) return;
+    final pending = await _queue.loadPendingGatePassLogs();
+    for (final log in pending) {
+      try {
+        await _writeGatePassLog(log);
+        await _queue.removeGatePass(log.id);
+      } catch (_) {
+        // Keep the pending gate pass for the next reconnect attempt.
       }
     }
   }
@@ -219,15 +414,74 @@ class AttendanceService {
     );
   }
 
-  Future<bool> _isDuplicate(AttendanceLog log) async {
+  Future<bool> _isDuplicate(
+    AttendanceLog log, {
+    required int duplicateWindowMinutes,
+  }) async {
     final query = await _firestore
         .collection('school_years')
         .doc(log.schoolYearId)
         .collection('attendance_logs')
         .where('duplicateKey', isEqualTo: log.duplicateKey)
-        .limit(1)
         .get();
-    return query.docs.isNotEmpty;
+    final window = Duration(minutes: duplicateWindowMinutes);
+    return query.docs.map(AttendanceLog.fromDoc).any((existing) {
+      final difference = existing.timestamp.difference(log.timestamp).abs();
+      return difference <= window;
+    });
+  }
+
+  AttendanceLog _duplicateLog(
+    AttendanceLog log, {
+    required SyncStatus syncStatus,
+  }) {
+    return AttendanceLog(
+      id: log.id,
+      personId: log.personId,
+      fullName: log.fullName,
+      personRole: log.personRole,
+      section: log.section,
+      dateKey: log.dateKey,
+      timeText: log.timeText,
+      attendanceType: log.attendanceType,
+      attendanceStatus: AttendanceStatus.duplicate,
+      scannedBy: log.scannedBy,
+      scannerUserId: log.scannerUserId,
+      deviceId: log.deviceId,
+      offline: log.offline,
+      syncStatus: syncStatus,
+      timestamp: log.timestamp,
+      schoolYearId: log.schoolYearId,
+      schoolYear: log.schoolYear,
+      activeTerm: log.activeTerm,
+    );
+  }
+
+  Future<GatePassLog?> _findUnclosedGatePass({
+    required String schoolYearId,
+    required String personId,
+    required bool online,
+  }) async {
+    if (!online) {
+      return _queue.findPendingUnclosedGatePass(
+        schoolYearId: schoolYearId,
+        personId: personId,
+      );
+    }
+
+    final query = await _firestore
+        .collection('school_years')
+        .doc(schoolYearId)
+        .collection('gate_pass_logs')
+        .where('personId', isEqualTo: personId)
+        .get();
+    final unclosedLogs =
+        query.docs
+            .map(GatePassLog.fromDoc)
+            .where((log) => log.status != GatePassStatus.returned)
+            .toList()
+          ..sort((a, b) => b.exitTime.compareTo(a.exitTime));
+    return unclosedLogs.firstOrNull;
   }
 
   Future<void> _writeLog(AttendanceLog log) async {
@@ -253,6 +507,50 @@ class AttendanceService {
         'status': log.attendanceStatus.label,
       },
     );
+  }
+
+  Future<void> _writeGatePassLog(GatePassLog log) async {
+    await _firestore
+        .collection('school_years')
+        .doc(log.schoolYearId)
+        .collection('gate_pass_logs')
+        .doc(log.id)
+        .set({
+          ...log.toMap(),
+          'syncStatus': SyncStatus.synced.name,
+          'offline': log.offline,
+        });
+    await _audit.record(
+      action: 'gate_pass_exit_logged',
+      actorId: log.scannerUserId,
+      actorName: log.scannedBy,
+      target: log.fullName,
+      metadata: {
+        'reason': log.reason,
+        'status': log.status.label,
+        'teacherBusinessType': log.teacherBusinessType?.label ?? '',
+      },
+    );
+  }
+
+  GatePassLog _returnedGatePassLog(
+    GatePassLog log,
+    DateTime now, {
+    required bool offline,
+  }) {
+    return log.copyWith(
+      returnTime: now,
+      returnTimeText: DateFormat('hh:mm a').format(now),
+      status: GatePassStatus.returned,
+      durationMinutes: now.difference(log.exitTime).inMinutes.clamp(0, 1000000),
+      offline: log.offline || offline,
+      syncStatus: offline ? SyncStatus.pendingSync : SyncStatus.synced,
+      updatedAt: now,
+    );
+  }
+
+  int _wordCount(String value) {
+    return value.split(RegExp(r'\s+')).where((word) => word.isNotEmpty).length;
   }
 
   AttendanceStatus _attendanceStatus(

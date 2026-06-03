@@ -9,6 +9,9 @@ import '../../shared/widgets/app_widgets.dart';
 import '../../shared/widgets/admin_widgets.dart';
 
 part 'widgets/add_user_dialog.dart';
+part 'widgets/user_card.dart';
+part 'widgets/user_role_section.dart';
+part 'widgets/user_search_field.dart';
 part 'widgets/users_table.dart';
 
 class UserManagementPage extends StatefulWidget {
