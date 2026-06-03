@@ -18,6 +18,14 @@ class ScannerViewModel extends BaseViewModel {
   String? message;
   String? _lastScannedCode;
   DateTime? _lastScannedAt;
+  SystemSettings _settings = const SystemSettings();
+
+  SystemSettings get settings => _settings;
+
+  Future<void> loadSettings() async {
+    _settings = await _app.attendance.loadSettings();
+    notifyListeners();
+  }
 
   void selectMode(ScannerLogMode nextMode) {
     mode = nextMode;
@@ -126,7 +134,8 @@ class ScannerViewModel extends BaseViewModel {
     final recentlyScannedSameCode =
         code == _lastScannedCode &&
         _lastScannedAt != null &&
-        now.difference(_lastScannedAt!) < const Duration(seconds: 2);
+        now.difference(_lastScannedAt!) <
+            Duration(seconds: _settings.scannerDetectionCooldownSeconds);
     if (busy || recentlyScannedSameCode) return false;
     _lastScannedCode = code;
     _lastScannedAt = now;

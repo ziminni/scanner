@@ -45,11 +45,31 @@ class OfflineQueueService {
     }).toList();
   }
 
-  Future<void> enqueue(AttendanceLog log) async {
+  Future<void> enqueue(
+    AttendanceLog log, {
+    required int duplicateWindowMinutes,
+  }) async {
     final pending = await loadPendingLogs();
-    if (pending.any((item) => item.duplicateKey == log.duplicateKey)) return;
+    if (_hasDuplicateWithinWindow(
+      pending,
+      log,
+      duplicateWindowMinutes: duplicateWindowMinutes,
+    )) {
+      return;
+    }
     pending.add(log);
     await _save(pending);
+  }
+
+  Future<bool> hasPendingDuplicate(
+    AttendanceLog log, {
+    required int duplicateWindowMinutes,
+  }) async {
+    return _hasDuplicateWithinWindow(
+      await loadPendingLogs(),
+      log,
+      duplicateWindowMinutes: duplicateWindowMinutes,
+    );
   }
 
   Future<List<GatePassLog>> loadPendingGatePassLogs() async {
@@ -236,4 +256,17 @@ class OfflineQueueService {
     'term3Start': schoolYear.termStarts.elementAtOrNull(2)?.toIso8601String(),
     'term3End': schoolYear.termEnds.elementAtOrNull(2)?.toIso8601String(),
   };
+
+  bool _hasDuplicateWithinWindow(
+    List<AttendanceLog> logs,
+    AttendanceLog log, {
+    required int duplicateWindowMinutes,
+  }) {
+    final window = Duration(minutes: duplicateWindowMinutes);
+    return logs.any((item) {
+      if (item.duplicateKey != log.duplicateKey) return false;
+      final difference = item.timestamp.difference(log.timestamp).abs();
+      return difference <= window;
+    });
+  }
 }

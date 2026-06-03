@@ -261,7 +261,7 @@ class _SystemHealthSection extends StatelessWidget {
         ),
         _CountDashboardCard(
           title: 'Storage Usage',
-          subtitle: 'Backup storage',
+          subtitle: 'Estimated Firestore data',
           icon: Icons.inventory_2_outlined,
           iconColor: Colors.orange,
           future: app.admin.storageUsageBytes(),
@@ -316,34 +316,63 @@ class _ActivitySection extends StatelessWidget {
         children: [
           _CompactActivityLabel(),
           _ActivityChip(
+            label: 'Users',
+            icon: Icons.manage_accounts_outlined,
+            color: Colors.blue,
+            future: _queryCount(app.repository.usersQuery()),
+          ),
+          _ActivityChip(
             label: 'Students',
             icon: Icons.school_outlined,
             color: Colors.green,
-            query: app.repository.activeCollectionGroupQuery('students'),
+            future: _activeCollectionGroupCount(app, 'students'),
           ),
           _ActivityChip(
             label: 'Teachers',
             icon: Icons.badge_outlined,
             color: Colors.teal,
-            query: app.repository.activeCollectionGroupQuery('teachers'),
+            future: _activeCollectionGroupCount(app, 'teachers'),
           ),
           _ActivityChip(
             label: 'Attendance',
             icon: Icons.list_alt_outlined,
             color: Colors.indigo,
-            query: app.repository.collectionGroup('attendance_logs'),
+            future: _queryCount(
+              app.repository.collectionGroup('attendance_logs'),
+            ),
+          ),
+          _ActivityChip(
+            label: 'Scanners',
+            icon: Icons.qr_code_scanner,
+            color: Colors.deepPurple,
+            future: _queryCount(app.repository.activeStaffScannerUsersQuery()),
           ),
           _ActivityChip(
             label: 'Late',
             icon: Icons.schedule_outlined,
             color: Colors.orange,
-            query: app.repository.attendanceStatusCollectionGroupQuery(
-              AttendanceStatus.late.name,
+            future: _queryCount(
+              app.repository.attendanceStatusCollectionGroupQuery(
+                AttendanceStatus.late.name,
+              ),
             ),
           ),
         ],
       ),
     );
+  }
+
+  Future<int> _queryCount(Query<Map<String, dynamic>> query) async {
+    final snapshot = await query.count().get();
+    return snapshot.count ?? 0;
+  }
+
+  Future<int> _activeCollectionGroupCount(
+    AppController app,
+    String collection,
+  ) async {
+    final snapshot = await app.repository.collectionGroup(collection).get();
+    return snapshot.docs.where((doc) => doc.data()['archived'] != true).length;
   }
 }
 
@@ -379,21 +408,25 @@ class _ActivityChip extends StatelessWidget {
     required this.label,
     required this.icon,
     required this.color,
-    required this.query,
+    required this.future,
   });
 
   final String label;
   final IconData icon;
   final Color color;
-  final Query<Map<String, dynamic>> query;
+  final Future<int> future;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return FutureBuilder<AggregateQuerySnapshot>(
-      future: query.count().get(),
+    return FutureBuilder<int>(
+      future: future,
       builder: (context, snapshot) {
-        final value = (snapshot.data?.count ?? 0).toString();
+        final value = snapshot.connectionState == ConnectionState.waiting
+            ? '-'
+            : snapshot.hasError
+            ? '!'
+            : (snapshot.data ?? 0).toString();
         return Container(
           height: 42,
           padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -436,44 +469,70 @@ class _QuickActionsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _DashboardPanel(
-      title: 'Quick Actions',
-      icon: Icons.flash_on_outlined,
-      child: Column(
-        children: [
-          _QuickActionButton(
-            icon: Icons.person_add_alt,
-            label: 'Manage users',
-            onPressed: () => context.go(AppRoutes.usersPath),
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(
+              Icons.flash_on_outlined,
+              size: 20,
+              color: theme.colorScheme.primary,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'Quick Actions',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        DataSurface(
+          child: Column(
+            children: [
+              _QuickActionButton(
+                key: const ValueKey('quick-action-manage-users'),
+                icon: Icons.person_add_alt,
+                label: 'Manage users',
+                onPressed: () => context.go(AppRoutes.usersPath),
+              ),
+              _QuickActionButton(
+                key: const ValueKey('quick-action-backup-database'),
+                icon: Icons.backup_outlined,
+                label: 'Backup database',
+                onPressed: () async {
+                  await app.admin.backupDatabase(app.currentUser!);
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Database backup created.')),
+                  );
+                },
+              ),
+              _QuickActionButton(
+                key: const ValueKey('quick-action-database-management'),
+                icon: Icons.storage_outlined,
+                label: 'Database management',
+                onPressed: () => context.go(AppRoutes.databasePath),
+              ),
+              _QuickActionButton(
+                key: const ValueKey('quick-action-school-year-history'),
+                icon: Icons.history_outlined,
+                label: 'School year history',
+                onPressed: () => context.go(AppRoutes.archivesPath),
+              ),
+              _QuickActionButton(
+                key: const ValueKey('quick-action-system-settings'),
+                icon: Icons.tune_outlined,
+                label: 'System settings',
+                onPressed: () => context.go(AppRoutes.settingsPath),
+              ),
+            ],
           ),
-          _QuickActionButton(
-            icon: Icons.backup_outlined,
-            label: 'Backup database',
-            onPressed: () async {
-              await app.admin.backupDatabase(app.currentUser!);
-              if (!context.mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Database backup created.')),
-              );
-            },
-          ),
-          _QuickActionButton(
-            icon: Icons.storage_outlined,
-            label: 'Database management',
-            onPressed: () => context.go(AppRoutes.databasePath),
-          ),
-          _QuickActionButton(
-            icon: Icons.history_outlined,
-            label: 'School year history',
-            onPressed: () => context.go(AppRoutes.archivesPath),
-          ),
-          _QuickActionButton(
-            icon: Icons.tune_outlined,
-            label: 'System settings',
-            onPressed: () => context.go(AppRoutes.settingsPath),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -575,44 +634,6 @@ class _DashboardCardGrid extends StatelessWidget {
       crossAxisSpacing: 14,
       mainAxisSpacing: 14,
       children: children,
-    );
-  }
-}
-
-class _DashboardPanel extends StatelessWidget {
-  const _DashboardPanel({
-    required this.title,
-    required this.icon,
-    required this.child,
-  });
-
-  final String title;
-  final IconData icon;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return DataSurface(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, size: 20, color: theme.colorScheme.primary),
-              const SizedBox(width: 8),
-              Text(
-                title,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          child,
-        ],
-      ),
     );
   }
 }
@@ -754,6 +775,7 @@ class _DashboardStatCard extends StatelessWidget {
 
 class _QuickActionButton extends StatelessWidget {
   const _QuickActionButton({
+    super.key,
     required this.icon,
     required this.label,
     required this.onPressed,
@@ -765,15 +787,40 @@ class _QuickActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: OutlinedButton.icon(
-        icon: Icon(icon),
-        label: Text(label),
-        onPressed: onPressed,
-        style: OutlinedButton.styleFrom(
-          minimumSize: const Size(double.infinity, 44),
-          alignment: Alignment.centerLeft,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(14),
+          child: Container(
+            width: double.infinity,
+            constraints: const BoxConstraints(minHeight: 44),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: theme.colorScheme.primary.withAlpha(140),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(icon, color: theme.colorScheme.primary),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      color: theme.colorScheme.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

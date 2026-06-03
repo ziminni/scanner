@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -272,12 +273,70 @@ class AdminService {
   }
 
   Future<int> storageUsageBytes() async {
-    final backups = await _firestore.collection('backups').get();
-    return backups.docs.fold<int>(
-      0,
-      (total, doc) => total + ((doc.data()['sizeBytes'] as int?) ?? 0),
-    );
+    final snapshots = await Future.wait([
+      for (final collection in _rootCollectionsForSize)
+        _firestore.collection(collection).get(),
+      for (final collection in _schoolYearSubcollectionsForSize)
+        _firestore.collectionGroup(collection).get(),
+    ]);
+
+    var total = 0;
+    for (final snapshot in snapshots) {
+      for (final doc in snapshot.docs) {
+        total += _estimateDocumentBytes(doc);
+      }
+    }
+    return total;
   }
 
   Reference storageRef(String path) => _storage.ref(path);
+
+  static const _rootCollectionsForSize = [
+    'users',
+    'school_years',
+    'sections',
+    'archives',
+    'audit_logs',
+    'backups',
+    'scanner_devices',
+    'exports',
+  ];
+
+  static const _schoolYearSubcollectionsForSize = [
+    'students',
+    'teachers',
+    'attendance_logs',
+    'gate_pass_logs',
+    'terms',
+    'reports',
+  ];
+
+  int _estimateDocumentBytes(DocumentSnapshot<Map<String, dynamic>> doc) {
+    final normalized = _normalizeFirestoreValue(doc.data() ?? const {});
+    final encodedData = utf8.encode(jsonEncode(normalized)).length;
+    final encodedPath = utf8.encode(doc.reference.path).length;
+    return encodedPath + encodedData;
+  }
+
+  Object? _normalizeFirestoreValue(Object? value) {
+    if (value == null || value is String || value is num || value is bool) {
+      return value;
+    }
+    if (value is Timestamp) return value.toDate().toIso8601String();
+    if (value is GeoPoint) {
+      return {'latitude': value.latitude, 'longitude': value.longitude};
+    }
+    if (value is DocumentReference) return value.path;
+    if (value is Blob) return base64Encode(value.bytes);
+    if (value is Iterable) {
+      return value.map(_normalizeFirestoreValue).toList();
+    }
+    if (value is Map) {
+      return {
+        for (final entry in value.entries)
+          entry.key.toString(): _normalizeFirestoreValue(entry.value),
+      };
+    }
+    return value.toString();
+  }
 }

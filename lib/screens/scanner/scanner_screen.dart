@@ -37,6 +37,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
     if (_viewModelReady) return;
     _viewModel = ScannerViewModel(AppScope.of(context));
     _viewModelReady = true;
+    unawaited(_viewModel.loadSettings());
   }
 
   @override
@@ -53,6 +54,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
     if (feedback != null) {
       return _ScanFeedbackPage(
         data: feedback,
+        autoCloseSeconds: _viewModel.settings.successFeedbackSeconds,
         onDone: () {
           _viewModel.clearResult();
           setState(() {
@@ -393,11 +395,14 @@ class _ScannerScreenState extends State<ScannerScreen> {
   }
 
   Future<void> _showScanIssueDialog(String message) async {
-    final timer = Timer(const Duration(seconds: 8), () {
-      if (!mounted) return;
-      final navigator = Navigator.of(context, rootNavigator: true);
-      if (navigator.canPop()) navigator.pop();
-    });
+    final timer = Timer(
+      Duration(seconds: _viewModel.settings.scanIssueAutoCloseSeconds),
+      () {
+        if (!mounted) return;
+        final navigator = Navigator.of(context, rootNavigator: true);
+        if (navigator.canPop()) navigator.pop();
+      },
+    );
     try {
       await showDialog<void>(
         context: context,
@@ -431,6 +436,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
       builder: (_) => _GatePassReasonDialog(
         initialBusinessType: _viewModel.teacherBusinessType,
         initialExpectedToReturn: _viewModel.expectedToReturn,
+        wordLimit: _viewModel.settings.gatePassReasonWordLimit,
       ),
     );
   }
@@ -447,9 +453,14 @@ class _ScannerScreenState extends State<ScannerScreen> {
 }
 
 class _ScanFeedbackPage extends StatefulWidget {
-  const _ScanFeedbackPage({required this.data, required this.onDone});
+  const _ScanFeedbackPage({
+    required this.data,
+    required this.autoCloseSeconds,
+    required this.onDone,
+  });
 
   final _ScanFeedbackData data;
+  final int autoCloseSeconds;
   final VoidCallback onDone;
 
   @override
@@ -458,12 +469,13 @@ class _ScanFeedbackPage extends StatefulWidget {
 
 class _ScanFeedbackPageState extends State<_ScanFeedbackPage> {
   Timer? _timer;
-  int _remainingSeconds = 3;
+  late int _remainingSeconds;
   bool _done = false;
 
   @override
   void initState() {
     super.initState();
+    _remainingSeconds = widget.autoCloseSeconds.clamp(1, 30).toInt();
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (_remainingSeconds <= 1) {
         _finish();
@@ -670,10 +682,12 @@ class _GatePassReasonDialog extends StatefulWidget {
   const _GatePassReasonDialog({
     required this.initialBusinessType,
     required this.initialExpectedToReturn,
+    required this.wordLimit,
   });
 
   final TeacherBusinessType initialBusinessType;
   final bool initialExpectedToReturn;
+  final int wordLimit;
 
   @override
   State<_GatePassReasonDialog> createState() => _GatePassReasonDialogState();
@@ -721,7 +735,7 @@ class _GatePassReasonDialogState extends State<_GatePassReasonDialog> {
               onChanged: (_) => setState(() => _errorText = null),
             ),
             const SizedBox(height: 6),
-            Text('$words / 52 words'),
+            Text('$words / ${widget.wordLimit} words'),
             const SizedBox(height: 16),
             DropdownButtonFormField<TeacherBusinessType>(
               initialValue: _businessType,
@@ -768,9 +782,10 @@ class _GatePassReasonDialogState extends State<_GatePassReasonDialog> {
       });
       return;
     }
-    if (wordCount > 52) {
+    if (wordCount > widget.wordLimit) {
       setState(() {
-        _errorText = 'Reason is too long. Please keep it within 52 words.';
+        _errorText =
+            'Reason is too long. Please keep it within ${widget.wordLimit} words.';
       });
       return;
     }

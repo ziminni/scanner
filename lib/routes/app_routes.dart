@@ -92,6 +92,7 @@ class AppRoutes {
         final pageId = pageIdFromPath(location);
         if (pageId == null) return defaultPathFor(user);
         if (!app.auth.canAccess(user, pageId)) {
+          app.recordUnauthorizedAccess(pageId, location);
           return defaultPathFor(user);
         }
         return null;
@@ -122,7 +123,7 @@ class AppRoutes {
           name: dashboard,
           pageId: dashboard,
           builder: (context) {
-            final role = AppScope.of(context).currentUser!.role;
+            final role = app.currentUser!.role;
             return role == UserRole.systemAdministrator
                 ? const SystemAdminDashboardPage()
                 : const SchoolAdminDashboardPage();
@@ -157,7 +158,7 @@ class AppRoutes {
           name: archives,
           pageId: archives,
           builder: (context) {
-            final role = AppScope.of(context).currentUser!.role;
+            final role = app.currentUser!.role;
             return role == UserRole.systemAdministrator
                 ? const SystemArchiveManagementPage()
                 : const SchoolArchiveManagementPage();
@@ -198,7 +199,7 @@ class AppRoutes {
           name: logs,
           pageId: logs,
           builder: (context) {
-            final role = AppScope.of(context).currentUser!.role;
+            final role = app.currentUser!.role;
             return role == UserRole.staffScanner
                 ? const ScannerLogsPage()
                 : const AttendanceLogsPage();
@@ -253,14 +254,17 @@ class AppRoutes {
     return GoRoute(
       path: path,
       name: name,
-      pageBuilder: (context, state) => NoTransitionPage(
-        child: AppShell(
-          currentPage: pageId,
-          child: _requiresActiveSchoolYear(pageId)
-              ? ActiveSchoolYearGate(child: builder(context))
-              : builder(context),
-        ),
-      ),
+      pageBuilder: (context, state) {
+        final page = builder(context);
+        return NoTransitionPage(
+          child: AppShell(
+            currentPage: pageId,
+            child: _requiresActiveSchoolYear(pageId)
+                ? ActiveSchoolYearGate(child: page)
+                : page,
+          ),
+        );
+      },
     );
   }
 

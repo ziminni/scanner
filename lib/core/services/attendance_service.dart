@@ -171,32 +171,25 @@ class AttendanceService {
     );
 
     if (!online) {
-      await _queue.enqueue(log);
+      if (await _queue.hasPendingDuplicate(
+        log,
+        duplicateWindowMinutes: settings.duplicateWindowMinutes,
+      )) {
+        return _duplicateLog(log, syncStatus: SyncStatus.pendingSync);
+      }
+      await _queue.enqueue(
+        log,
+        duplicateWindowMinutes: settings.duplicateWindowMinutes,
+      );
       return log;
     }
 
-    final duplicate = await _isDuplicate(log);
+    final duplicate = await _isDuplicate(
+      log,
+      duplicateWindowMinutes: settings.duplicateWindowMinutes,
+    );
     if (duplicate) {
-      return AttendanceLog(
-        id: log.id,
-        personId: log.personId,
-        fullName: log.fullName,
-        personRole: log.personRole,
-        section: log.section,
-        dateKey: log.dateKey,
-        timeText: log.timeText,
-        attendanceType: log.attendanceType,
-        attendanceStatus: AttendanceStatus.duplicate,
-        scannedBy: log.scannedBy,
-        scannerUserId: log.scannerUserId,
-        deviceId: log.deviceId,
-        offline: log.offline,
-        syncStatus: SyncStatus.synced,
-        timestamp: log.timestamp,
-        schoolYearId: log.schoolYearId,
-        schoolYear: log.schoolYear,
-        activeTerm: log.activeTerm,
-      );
+      return _duplicateLog(log, syncStatus: SyncStatus.synced);
     }
 
     await _writeLog(log);
@@ -215,8 +208,11 @@ class AttendanceService {
     if (trimmedReason.isEmpty) {
       throw StateError('Please enter the reason for going outside.');
     }
-    if (_wordCount(trimmedReason) > 52) {
-      throw StateError('Reason is too long. Please keep it within 52 words.');
+    final settings = await loadSettings();
+    if (_wordCount(trimmedReason) > settings.gatePassReasonWordLimit) {
+      throw StateError(
+        'Reason is too long. Please keep it within ${settings.gatePassReasonWordLimit} words.',
+      );
     }
 
     await validateGatePassExitAllowed(scannedId);
@@ -368,10 +364,14 @@ class AttendanceService {
 
   Future<void> syncPendingLogs() async {
     if (!await _queue.isOnline) return;
+    final settings = await loadSettings();
     final pending = await _queue.loadPendingLogs();
     for (final log in pending) {
       try {
-        if (!await _isDuplicate(log)) {
+        if (!await _isDuplicate(
+          log,
+          duplicateWindowMinutes: settings.duplicateWindowMinutes,
+        )) {
           await _writeLog(log);
         }
         await _queue.remove(log.id);
@@ -414,15 +414,47 @@ class AttendanceService {
     );
   }
 
-  Future<bool> _isDuplicate(AttendanceLog log) async {
+  Future<bool> _isDuplicate(
+    AttendanceLog log, {
+    required int duplicateWindowMinutes,
+  }) async {
     final query = await _firestore
         .collection('school_years')
         .doc(log.schoolYearId)
         .collection('attendance_logs')
         .where('duplicateKey', isEqualTo: log.duplicateKey)
-        .limit(1)
         .get();
-    return query.docs.isNotEmpty;
+    final window = Duration(minutes: duplicateWindowMinutes);
+    return query.docs.map(AttendanceLog.fromDoc).any((existing) {
+      final difference = existing.timestamp.difference(log.timestamp).abs();
+      return difference <= window;
+    });
+  }
+
+  AttendanceLog _duplicateLog(
+    AttendanceLog log, {
+    required SyncStatus syncStatus,
+  }) {
+    return AttendanceLog(
+      id: log.id,
+      personId: log.personId,
+      fullName: log.fullName,
+      personRole: log.personRole,
+      section: log.section,
+      dateKey: log.dateKey,
+      timeText: log.timeText,
+      attendanceType: log.attendanceType,
+      attendanceStatus: AttendanceStatus.duplicate,
+      scannedBy: log.scannedBy,
+      scannerUserId: log.scannerUserId,
+      deviceId: log.deviceId,
+      offline: log.offline,
+      syncStatus: syncStatus,
+      timestamp: log.timestamp,
+      schoolYearId: log.schoolYearId,
+      schoolYear: log.schoolYear,
+      activeTerm: log.activeTerm,
+    );
   }
 
   Future<GatePassLog?> _findUnclosedGatePass({

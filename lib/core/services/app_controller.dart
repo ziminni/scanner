@@ -83,6 +83,24 @@ class AppController extends ChangeNotifier {
     scheduleMicrotask(notifyListeners);
     unawaited(auth.logout(reason: 'unauthorized_route'));
   }
+
+  void recordUnauthorizedAccess(String pageId, String location) {
+    final user = currentUser;
+    if (user == null) return;
+    unawaited(
+      audit.record(
+        action: 'unauthorized_access_attempt',
+        actorId: user.id,
+        actorName: user.fullName,
+        target: location,
+        metadata: {
+          'pageId': pageId,
+          'role': user.role.label,
+          'email': user.email,
+        },
+      ),
+    );
+  }
 }
 
 class AppScope extends InheritedNotifier<AppController> {

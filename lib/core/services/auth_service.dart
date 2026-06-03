@@ -60,10 +60,28 @@ class AuthService {
   }
 
   Future<AppUser> login(String email, String password) async {
-    final credential = await _auth.signInWithEmailAndPassword(
-      email: email.trim(),
-      password: password,
-    );
+    final normalizedEmail = email.trim().toLowerCase();
+    final UserCredential credential;
+    try {
+      credential = await _auth.signInWithEmailAndPassword(
+        email: normalizedEmail,
+        password: password,
+      );
+    } on FirebaseAuthException catch (error) {
+      await _auditService.record(
+        action: _failedLoginAction(error.code),
+        actorId: normalizedEmail,
+        actorName: normalizedEmail.isEmpty ? 'Unknown email' : normalizedEmail,
+        target: 'Firebase Authentication',
+        metadata: {
+          'email': normalizedEmail,
+          'code': error.code,
+          'message': error.message ?? '',
+          'platform': kIsWeb ? 'web' : 'mobile',
+        },
+      );
+      rethrow;
+    }
     final uid = credential.user!.uid;
     final doc = await _firestore.collection('users').doc(uid).get();
     if (!doc.exists) {
@@ -126,6 +144,18 @@ class AuthService {
     );
     await _cacheUserProfile(appUser);
     return appUser;
+  }
+
+  String _failedLoginAction(String code) {
+    return switch (code) {
+      'wrong-password' ||
+      'invalid-credential' ||
+      'invalid-login-credentials' => 'failed_login_invalid_credentials',
+      'user-not-found' => 'failed_login_unknown_email',
+      'too-many-requests' => 'failed_login_rate_limited',
+      'user-disabled' => 'failed_login_firebase_disabled',
+      _ => 'failed_login_error',
+    };
   }
 
   Future<void> logout({String reason = 'user_logout'}) async {
