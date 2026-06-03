@@ -4,10 +4,12 @@ import 'dart:convert';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../constants/enums.dart';
 import '../../models/models.dart';
 
 class OfflineQueueService {
   static const _queueKey = 'pending_attendance_logs';
+  static const _gatePassQueueKey = 'pending_gate_pass_logs';
   static const _activeSchoolYearKey = 'cached_active_school_year';
   static const _personCacheKey = 'cached_people';
 
@@ -48,6 +50,63 @@ class OfflineQueueService {
     if (pending.any((item) => item.duplicateKey == log.duplicateKey)) return;
     pending.add(log);
     await _save(pending);
+  }
+
+  Future<List<GatePassLog>> loadPendingGatePassLogs() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getStringList(_gatePassQueueKey) ?? const [];
+    return raw.map((item) {
+      final decoded = jsonDecode(item) as Map<String, dynamic>;
+      return GatePassLog.fromMap(
+        decoded['id'] as String,
+        Map<String, dynamic>.from(decoded['data'] as Map),
+      );
+    }).toList();
+  }
+
+  Future<void> enqueueGatePass(GatePassLog log) async {
+    final pending = await loadPendingGatePassLogs();
+    if (pending.any((item) => item.id == log.id)) return;
+    pending.add(log);
+    await _saveGatePassLogs(pending);
+  }
+
+  Future<GatePassLog?> findPendingOpenGatePass({
+    required String schoolYearId,
+    required String personId,
+  }) async {
+    final pending = await loadPendingGatePassLogs();
+    for (final log in pending.reversed) {
+      if (log.schoolYearId == schoolYearId &&
+          log.personId == personId &&
+          log.status == GatePassStatus.outside) {
+        return log;
+      }
+    }
+    return null;
+  }
+
+  Future<GatePassLog?> findPendingUnclosedGatePass({
+    required String schoolYearId,
+    required String personId,
+  }) async {
+    final pending = await loadPendingGatePassLogs();
+    for (final log in pending.reversed) {
+      if (log.schoolYearId == schoolYearId &&
+          log.personId == personId &&
+          log.status != GatePassStatus.returned) {
+        return log;
+      }
+    }
+    return null;
+  }
+
+  Future<void> updatePendingGatePass(GatePassLog updatedLog) async {
+    final pending = await loadPendingGatePassLogs();
+    final index = pending.indexWhere((log) => log.id == updatedLog.id);
+    if (index == -1) return;
+    pending[index] = updatedLog;
+    await _saveGatePassLogs(pending);
   }
 
   Future<void> cacheActiveSchoolYear(SchoolYear schoolYear) async {
@@ -119,6 +178,12 @@ class OfflineQueueService {
     await _save(pending);
   }
 
+  Future<void> removeGatePass(String id) async {
+    final pending = await loadPendingGatePassLogs();
+    pending.removeWhere((log) => log.id == id);
+    await _saveGatePassLogs(pending);
+  }
+
   Future<void> markFailed(String id) async {
     final pending = await loadPendingLogs();
     await _save(pending);
@@ -134,9 +199,31 @@ class OfflineQueueService {
     );
   }
 
+  Future<void> _saveGatePassLogs(List<GatePassLog> logs) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(
+      _gatePassQueueKey,
+      logs
+          .map(
+            (log) =>
+                jsonEncode({'id': log.id, 'data': _offlineGatePassMap(log)}),
+          )
+          .toList(),
+    );
+  }
+
   Map<String, dynamic> _offlineMap(AttendanceLog log) => {
     ...log.toMap(),
     'timestamp': log.timestamp.toIso8601String(),
+    'syncStatus': 'pendingSync',
+  };
+
+  Map<String, dynamic> _offlineGatePassMap(GatePassLog log) => {
+    ...log.toMap(),
+    'exitTime': log.exitTime.toIso8601String(),
+    'returnTime': log.returnTime?.toIso8601String(),
+    'timestamp': log.timestamp.toIso8601String(),
+    'updatedAt': log.updatedAt.toIso8601String(),
     'syncStatus': 'pendingSync',
   };
 

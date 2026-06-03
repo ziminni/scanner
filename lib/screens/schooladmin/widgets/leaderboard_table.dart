@@ -1,10 +1,15 @@
 part of '../early_students_page.dart';
 
 class _LeaderboardTable extends StatelessWidget {
-  const _LeaderboardTable({required this.entries, required this.period});
+  const _LeaderboardTable({
+    required this.entries,
+    required this.period,
+    required this.selectedRole,
+  });
 
   final List<EarlyLeaderboardEntry> entries;
   final EarlyLeaderboardPeriod period;
+  final PersonRole selectedRole;
 
   @override
   Widget build(BuildContext context) {
@@ -15,7 +20,7 @@ class _LeaderboardTable extends StatelessWidget {
         child: DataTable(
           columns: [
             const DataColumn(label: Text('Rank')),
-            const DataColumn(label: Text('Student ID')),
+            DataColumn(label: Text('${selectedRole.label} ID')),
             const DataColumn(label: Text('Full Name')),
             const DataColumn(label: Text('Section')),
             if (isDaily) const DataColumn(label: Text('Time In')),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/constants/enums.dart';
 import '../../core/services/app_controller.dart';
 import '../../shared/widgets/admin_widgets.dart';
 import '../../shared/widgets/app_widgets.dart';
@@ -8,6 +9,7 @@ import '../../shared/widgets/loading_widget.dart';
 import 'viewmodels/early_students_viewmodel.dart';
 
 part 'widgets/period_selector.dart';
+part 'widgets/role_selector.dart';
 part 'widgets/leaderboard_summary.dart';
 part 'widgets/metric.dart';
 part 'widgets/leaderboard_table.dart';
@@ -44,8 +46,12 @@ class _EarlyStudentsPageState extends State<EarlyStudentsPage> {
       animation: _viewModel,
       builder: (context, _) {
         return AdminPage(
-          title: 'Early Students',
+          title: 'Early Attendance',
           actions: [
+            _RoleSelector(
+              selected: _viewModel.selectedRole,
+              onChanged: _viewModel.setRole,
+            ),
             _PeriodSelector(
               selected: _viewModel.period,
               onChanged: _viewModel.setPeriod,
@@ -82,6 +88,7 @@ class _EarlyStudentsPageState extends State<EarlyStudentsPage> {
                 _LeaderboardTable(
                   entries: _viewModel.entries,
                   period: _viewModel.period,
+                  selectedRole: _viewModel.selectedRole,
                 ),
             ],
           ),

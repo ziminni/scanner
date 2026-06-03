@@ -1,5 +1,9 @@
+import 'dart:convert';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../constants/enums.dart';
 import '../../models/models.dart';
@@ -10,6 +14,7 @@ class AuthService {
 
   static const _bootstrapSystemAdminUid = 'FKg721Q77UdegDvMf8boGYcEYd53';
   static const _bootstrapSystemAdminEmail = 'systemadmin@user.com';
+  static const _cachedUserProfileKey = 'cached_current_user_profile';
 
   final FirebaseAuth _auth;
   final FirebaseFirestore _firestore;
@@ -21,7 +26,12 @@ class AuthService {
   Future<AppUser?> loadCurrentUser() async {
     final user = _auth.currentUser;
     if (user == null) return null;
-    final doc = await _firestore.collection('users').doc(user.uid).get();
+    final DocumentSnapshot<Map<String, dynamic>> doc;
+    try {
+      doc = await _firestore.collection('users').doc(user.uid).get();
+    } on FirebaseException {
+      return _loadCachedUserProfile(user.uid);
+    }
     if (!doc.exists) {
       final bootstrapped = await _bootstrapSystemAdminProfile(user);
       if (bootstrapped == null) {
@@ -31,7 +41,12 @@ class AuthService {
       return bootstrapped;
     }
     final appUser = AppUser.fromDoc(doc);
+    if (_isWebScannerAccount(appUser)) {
+      await logout(reason: 'scanner_web_access_blocked');
+      return null;
+    }
     if (!appUser.isActive) {
+      await _clearCachedUserProfile();
       await _auditService.record(
         action: 'blocked_login_disabled_account',
         actorId: appUser.id,
@@ -40,6 +55,7 @@ class AuthService {
       await logout(reason: 'disabled_account');
       return null;
     }
+    await _cacheUserProfile(appUser);
     return appUser;
   }
 
@@ -73,7 +89,21 @@ class AuthService {
     }
 
     final appUser = AppUser.fromDoc(doc);
+    if (_isWebScannerAccount(appUser)) {
+      await _auditService.record(
+        action: 'failed_login_scanner_web_blocked',
+        actorId: uid,
+        actorName: appUser.fullName,
+      );
+      await _auth.signOut();
+      await _clearCachedUserProfile();
+      throw FirebaseAuthException(
+        code: 'scanner-web-blocked',
+        message: 'Staff Scanner accounts can only sign in on the mobile app.',
+      );
+    }
     if (!appUser.isActive) {
+      await _clearCachedUserProfile();
       await _auditService.record(
         action: 'failed_login_disabled',
         actorId: uid,
@@ -94,6 +124,7 @@ class AuthService {
       actorId: uid,
       actorName: appUser.fullName,
     );
+    await _cacheUserProfile(appUser);
     return appUser;
   }
 
@@ -110,6 +141,7 @@ class AuthService {
       );
     }
     await _auth.signOut();
+    await _clearCachedUserProfile();
   }
 
   Future<AppUser?> _bootstrapSystemAdminProfile(User user) async {
@@ -135,7 +167,45 @@ class AuthService {
       'lastLoginAt': FieldValue.serverTimestamp(),
       'bootstrap': true,
     });
+    await _cacheUserProfile(appUser);
     return appUser;
+  }
+
+  Future<void> _cacheUserProfile(AppUser user) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _cachedUserProfileKey,
+      jsonEncode({
+        'id': user.id,
+        'email': user.email,
+        'fullName': user.fullName,
+        'role': user.role.key,
+        'status': user.status.name,
+        'schoolId': user.schoolId,
+        'createdAt': user.createdAt?.toIso8601String(),
+        'lastLoginAt': user.lastLoginAt?.toIso8601String(),
+      }),
+    );
+  }
+
+  Future<AppUser?> _loadCachedUserProfile(String uid) async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_cachedUserProfileKey);
+    if (raw == null) return null;
+    final decoded = jsonDecode(raw) as Map<String, dynamic>;
+    if (decoded['id'] != uid) return null;
+    final cached = AppUser.fromMap(uid, decoded);
+    if (_isWebScannerAccount(cached)) return null;
+    return cached.isActive ? cached : null;
+  }
+
+  Future<void> _clearCachedUserProfile() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_cachedUserProfileKey);
+  }
+
+  bool _isWebScannerAccount(AppUser user) {
+    return kIsWeb && user.role == UserRole.staffScanner;
   }
 
   bool canAccess(AppUser user, String pageId) {
@@ -172,5 +242,10 @@ class AuthService {
     'archives',
   };
 
-  static const _scannerPages = {'scanner', 'logs'};
+  static const _scannerPages = {
+    'scannerHome',
+    'scanner',
+    'logs',
+    'scannerSettings',
+  };
 }

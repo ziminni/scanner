@@ -65,6 +65,63 @@ enum AttendanceType {
   }
 }
 
+enum ScannerLogMode {
+  attendance,
+  gatePass;
+
+  String get label => switch (this) {
+    ScannerLogMode.attendance => 'Attendance',
+    ScannerLogMode.gatePass => 'Gate Pass',
+  };
+}
+
+enum GatePassAction {
+  logOut,
+  logBackIn;
+
+  String get label => switch (this) {
+    GatePassAction.logOut => 'Log Out',
+    GatePassAction.logBackIn => 'Log Back In',
+  };
+}
+
+enum TeacherBusinessType {
+  personal,
+  school;
+
+  String get label => switch (this) {
+    TeacherBusinessType.personal => 'Personal Business',
+    TeacherBusinessType.school => 'School Business',
+  };
+
+  static TeacherBusinessType? fromKey(String? value) {
+    return switch (value) {
+      'personal' => TeacherBusinessType.personal,
+      'school' => TeacherBusinessType.school,
+      _ => null,
+    };
+  }
+}
+
+enum GatePassStatus {
+  outside,
+  returned,
+  noReturn;
+
+  String get label => switch (this) {
+    GatePassStatus.outside => 'Outside',
+    GatePassStatus.returned => 'Returned',
+    GatePassStatus.noReturn => 'No Return',
+  };
+
+  static GatePassStatus fromKey(String? value) {
+    return GatePassStatus.values.firstWhere(
+      (status) => status.name == value,
+      orElse: () => GatePassStatus.outside,
+    );
+  }
+}
+
 enum AttendanceStatus {
   early,
   onTime,

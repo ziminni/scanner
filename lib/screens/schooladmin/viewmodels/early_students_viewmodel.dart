@@ -57,6 +57,7 @@ class EarlyStudentsViewModel extends BaseViewModel {
 
   DateTime selectedDate = _dateOnly(DateTime.now());
   EarlyLeaderboardPeriod period = EarlyLeaderboardPeriod.daily;
+  PersonRole selectedRole = PersonRole.student;
   SchoolYear? activeSchoolYear;
   String periodLabel = '';
   List<EarlyLeaderboardEntry> entries = [];
@@ -107,6 +108,12 @@ class EarlyStudentsViewModel extends BaseViewModel {
     await load();
   }
 
+  Future<void> setRole(PersonRole role) async {
+    selectedRole = role;
+    notifyListeners();
+    await load();
+  }
+
   Future<List<AttendanceLog>> _loadLogs(
     DateTime start,
     DateTime end,
@@ -121,14 +128,14 @@ class EarlyStudentsViewModel extends BaseViewModel {
   }
 
   Map<String, List<_DailyRank>> _dailyRankings(List<AttendanceLog> logs) {
-    final earliestByDateAndStudent = <String, Map<String, AttendanceLog>>{};
+    final earliestByDateAndPerson = <String, Map<String, AttendanceLog>>{};
 
     for (final log in logs) {
-      if (log.personRole != PersonRole.student) continue;
+      if (log.personRole != selectedRole) continue;
       if (!log.attendanceType.isTimeIn) continue;
       if (log.attendanceStatus == AttendanceStatus.duplicate) continue;
 
-      final dateLogs = earliestByDateAndStudent.putIfAbsent(
+      final dateLogs = earliestByDateAndPerson.putIfAbsent(
         log.dateKey,
         () => {},
       );
@@ -139,7 +146,7 @@ class EarlyStudentsViewModel extends BaseViewModel {
     }
 
     return {
-      for (final entry in earliestByDateAndStudent.entries)
+      for (final entry in earliestByDateAndPerson.entries)
         entry.key: _rankDaily(entry.value.values.toList()),
     };
   }
