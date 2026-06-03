@@ -49,6 +49,8 @@ class AttendanceStatusViewModel extends BaseViewModel {
   DateTime selectedDate = _dateOnly(DateTime.now());
   AttendanceStatusFilter filter = AttendanceStatusFilter.all;
   String search = '';
+  String roleFilter = '';
+  String sectionFilter = '';
   List<AttendanceStatusEntry> _entries = [];
 
   int get lateCount =>
@@ -73,6 +75,12 @@ class AttendanceStatusViewModel extends BaseViewModel {
           entry.status == AttendanceStatus.incomplete,
       };
       if (!matchesFilter) return false;
+      if (roleFilter.isNotEmpty && entry.role.label != roleFilter) {
+        return false;
+      }
+      if (sectionFilter.isNotEmpty && entry.section != sectionFilter) {
+        return false;
+      }
       if (query.isEmpty) return true;
       return '${entry.personId} ${entry.fullName} ${entry.section} ${entry.role.label}'
           .toLowerCase()
@@ -82,6 +90,17 @@ class AttendanceStatusViewModel extends BaseViewModel {
 
   String get selectedDateLabel =>
       DateFormat('MMM d, yyyy').format(selectedDate);
+
+  List<String> get sections {
+    final values =
+        _entries
+            .map((entry) => entry.section.trim())
+            .where((section) => section.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort();
+    return values;
+  }
 
   Future<void> load() async {
     setBusy(true);
@@ -136,6 +155,16 @@ class AttendanceStatusViewModel extends BaseViewModel {
 
   void setSearch(String value) {
     search = value;
+    notifyListeners();
+  }
+
+  void setRoleFilter(String value) {
+    roleFilter = value;
+    notifyListeners();
+  }
+
+  void setSectionFilter(String value) {
+    sectionFilter = value;
     notifyListeners();
   }
 

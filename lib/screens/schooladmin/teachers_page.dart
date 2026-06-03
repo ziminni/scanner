@@ -36,6 +36,8 @@ class TeachersPage extends StatefulWidget {
 
 class _TeachersPageState extends State<TeachersPage> {
   final _search = TextEditingController();
+  String _statusFilter = '';
+  String _scheduleFilter = '';
 
   @override
   void dispose() {
@@ -84,10 +86,51 @@ class _TeachersPageState extends State<TeachersPage> {
                   onChanged: (_) => setState(() {}),
                 ),
               ),
+              SizedBox(
+                width: 180,
+                child: DropdownButtonFormField<String>(
+                  initialValue: _statusFilter,
+                  decoration: const InputDecoration(labelText: 'Status'),
+                  items: const [
+                    DropdownMenuItem(value: '', child: Text('All')),
+                    DropdownMenuItem(value: 'Active', child: Text('Active')),
+                    DropdownMenuItem(
+                      value: 'Inactive',
+                      child: Text('Inactive'),
+                    ),
+                  ],
+                  onChanged: (value) =>
+                      setState(() => _statusFilter = value ?? ''),
+                ),
+              ),
+              SizedBox(
+                width: 180,
+                child: DropdownButtonFormField<String>(
+                  initialValue: _scheduleFilter,
+                  decoration: const InputDecoration(labelText: 'Schedule'),
+                  items: const [
+                    DropdownMenuItem(value: '', child: Text('All')),
+                    DropdownMenuItem(
+                      value: '07:00 - 16:00',
+                      child: Text('07:00 - 16:00'),
+                    ),
+                    DropdownMenuItem(
+                      value: '07:30 - 16:30',
+                      child: Text('07:30 - 16:30'),
+                    ),
+                  ],
+                  onChanged: (value) =>
+                      setState(() => _scheduleFilter = value ?? ''),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 12),
-          _TeachersTable(search: _search.text),
+          _TeachersTable(
+            search: _search.text,
+            statusFilter: _statusFilter,
+            scheduleFilter: _scheduleFilter,
+          ),
         ],
       ),
     );
