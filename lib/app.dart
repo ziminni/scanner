@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'core/constants/enums.dart';
 import 'core/constants/strings.dart';
 import 'core/services/app_controller.dart';
 import 'core/theme/app_theme.dart';
@@ -27,10 +28,20 @@ class _AttendanceAppState extends State<AttendanceApp> {
 
   @override
   Widget build(BuildContext context) {
+    final app = AppScope.of(context);
+    final user = app.currentUser;
+    ThemeData theme = AppTheme.light();
+    if (user != null) {
+      if (user.role == UserRole.systemAdministrator ||
+          user.role == UserRole.schoolAdministrator) {
+        theme = AppTheme.admin(theme);
+      }
+    }
+
     return MaterialApp.router(
       title: AppStrings.appName,
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.light(),
+      theme: theme,
       routerConfig: _router!,
     );
   }

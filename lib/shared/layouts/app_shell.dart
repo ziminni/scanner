@@ -4,8 +4,8 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/services/app_controller.dart';
 import '../../core/constants/enums.dart';
+import '../../core/services/app_controller.dart';
 import '../../models/models.dart';
 import '../../routes/app_routes.dart';
 import '../../screens/scanner/scanner_theme.dart';
@@ -584,6 +584,22 @@ class _ScannerHeaderTitleState extends State<_ScannerHeaderTitle> {
   }
 }
 
+class _NavItem {
+  const _NavItem(
+    this.id,
+    this.label,
+    this.shortLabel,
+    this.icon,
+    this.selectedIcon,
+  );
+
+  final String id;
+  final String label;
+  final String shortLabel;
+  final IconData icon;
+  final IconData selectedIcon;
+}
+
 class ActiveSchoolYearGate extends StatelessWidget {
   const ActiveSchoolYearGate({super.key, required this.child});
 
@@ -641,20 +657,4 @@ class ActiveSchoolYearGate extends StatelessWidget {
       },
     );
   }
-}
-
-class _NavItem {
-  const _NavItem(
-    this.id,
-    this.label,
-    this.shortLabel,
-    this.icon,
-    this.selectedIcon,
-  );
-
-  final String id;
-  final String label;
-  final String shortLabel;
-  final IconData icon;
-  final IconData selectedIcon;
 }
