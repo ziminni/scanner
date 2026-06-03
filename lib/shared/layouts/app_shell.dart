@@ -139,13 +139,6 @@ class AppShell extends StatelessWidget {
           Icons.dashboard,
         ),
         _NavItem(
-          AppRoutes.scannerUsers,
-          'Scanner Users',
-          'Scanners',
-          Icons.qr_code_scanner,
-          Icons.qr_code_scanner,
-        ),
-        _NavItem(
           AppRoutes.schoolYears,
           'School Year',
           'Years',
@@ -153,18 +146,18 @@ class AppShell extends StatelessWidget {
           Icons.calendar_month,
         ),
         _NavItem(
-          AppRoutes.students,
-          'Students',
-          'Students',
-          Icons.school_outlined,
-          Icons.school,
-        ),
-        _NavItem(
           AppRoutes.sections,
           'Sections',
           'Sections',
           Icons.groups_outlined,
           Icons.groups,
+        ),
+        _NavItem(
+          AppRoutes.students,
+          'Students',
+          'Students',
+          Icons.school_outlined,
+          Icons.school,
         ),
         _NavItem(
           AppRoutes.teachers,
@@ -196,17 +189,10 @@ class AppShell extends StatelessWidget {
         ),
         _NavItem(
           AppRoutes.reports,
-          'Reports & Export',
+          'Reports and Exports',
           'Reports',
           Icons.file_download_outlined,
           Icons.file_download,
-        ),
-        _NavItem(
-          AppRoutes.archives,
-          'Archives',
-          'Archives',
-          Icons.archive_outlined,
-          Icons.archive,
         ),
       ],
       UserRole.staffScanner => const [

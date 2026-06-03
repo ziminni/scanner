@@ -260,7 +260,6 @@ class AuthService {
 
   static const _schoolAdminPages = {
     'dashboard',
-    'scannerUsers',
     'schoolYears',
     'students',
     'sections',
@@ -269,7 +268,6 @@ class AuthService {
     'attendanceStatus',
     'earlyStudents',
     'reports',
-    'archives',
   };
 
   static const _scannerPages = {
