@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -54,7 +55,7 @@ class AppShell extends StatelessWidget {
             IconButton(
               tooltip: 'Logout',
               icon: const Icon(Icons.logout),
-              onPressed: app.logout,
+              onPressed: () => _confirmAndLogout(context),
             ),
           ],
         ),
@@ -362,10 +363,10 @@ class _HeaderAccountMenu extends StatelessWidget {
           case _HeaderAccountAction.profile:
             showDialog<void>(
               context: context,
-              builder: (_) => _HeaderProfileDialog(user: user),
+              builder: (_) => _EditableProfileDialog(user: user),
             );
           case _HeaderAccountAction.logout:
-            onLogout();
+            _confirmAndLogout(context);
         }
       },
       itemBuilder: (context) => const [
@@ -450,44 +451,220 @@ class _HeaderAccountMenu extends StatelessWidget {
 
 enum _HeaderAccountAction { profile, logout }
 
-class _HeaderProfileDialog extends StatelessWidget {
-  const _HeaderProfileDialog({required this.user});
+class _EditableProfileDialog extends StatefulWidget {
+  const _EditableProfileDialog({required this.user, this.scannerStyle = false});
 
   final AppUser user;
+  final bool scannerStyle;
+
+  @override
+  State<_EditableProfileDialog> createState() => _EditableProfileDialogState();
+}
+
+class _EditableProfileDialogState extends State<_EditableProfileDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _name;
+  late final TextEditingController _email;
+  bool _sendPasswordReset = false;
+  bool _busy = false;
+  String? _message;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _name = TextEditingController(text: widget.user.fullName);
+    _email = TextEditingController(text: widget.user.email);
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _email.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final primary = widget.scannerStyle
+        ? ScannerTheme.primary
+        : Theme.of(context).colorScheme.primary;
+
     return AlertDialog(
       title: const Text('Profile'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _HeaderProfileLine(label: 'Name', value: user.fullName),
-          _HeaderProfileLine(label: 'Email', value: user.email),
-          _HeaderProfileLine(label: 'Role', value: user.role.label),
-          _HeaderProfileLine(label: 'Status', value: user.status.label),
-        ],
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: SingleChildScrollView(
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                TextFormField(
+                  controller: _name,
+                  decoration: const InputDecoration(
+                    labelText: 'Name',
+                    prefixIcon: Icon(Icons.person_outline),
+                  ),
+                  textInputAction: TextInputAction.next,
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? 'Name is required.'
+                      : null,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _email,
+                  decoration: const InputDecoration(
+                    labelText: 'Email',
+                    prefixIcon: Icon(Icons.mail_outline),
+                  ),
+                  keyboardType: TextInputType.emailAddress,
+                  textInputAction: TextInputAction.done,
+                  validator: (value) =>
+                      value == null || !value.trim().contains('@')
+                      ? 'Enter a valid email.'
+                      : null,
+                ),
+                const SizedBox(height: 12),
+                CheckboxListTile(
+                  value: _sendPasswordReset,
+                  onChanged: _busy
+                      ? null
+                      : (value) {
+                          setState(() => _sendPasswordReset = value ?? false);
+                        },
+                  contentPadding: EdgeInsets.zero,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  title: const Text('Send password reset email'),
+                  subtitle: Text(
+                    'Firebase will email password reset instructions to ${widget.user.email}.',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _ProfileDetailLine(
+                  label: 'Role',
+                  value: widget.user.role.label,
+                  color: primary,
+                ),
+                _ProfileDetailLine(
+                  label: 'Status',
+                  value: widget.user.status.label,
+                  color: primary,
+                ),
+                if (_message != null) ...[
+                  const SizedBox(height: 8),
+                  Text(_message!, style: TextStyle(color: primary)),
+                ],
+                if (_error != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    _error!,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
       ),
       actions: [
-        FilledButton(
-          onPressed: () => Navigator.of(context).pop(),
+        TextButton(
+          onPressed: _busy ? null : () => Navigator.of(context).pop(),
           child: const Text('Close'),
+        ),
+        FilledButton.icon(
+          style: widget.scannerStyle
+              ? FilledButton.styleFrom(
+                  backgroundColor: ScannerTheme.primary,
+                  foregroundColor: Colors.white,
+                )
+              : null,
+          icon: _busy
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : const Icon(Icons.save_outlined),
+          label: Text(_busy ? 'Saving' : 'Save changes'),
+          onPressed: _busy ? null : _save,
         ),
       ],
     );
   }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() {
+      _busy = true;
+      _message = null;
+      _error = null;
+    });
+    try {
+      final passwordResetRequested = _sendPasswordReset;
+      await AppScope.of(context).updateProfile(
+        fullName: _name.text,
+        email: _email.text,
+        sendPasswordReset: passwordResetRequested,
+      );
+      if (!mounted) return;
+      final emailChanged =
+          _email.text.trim().toLowerCase() !=
+          widget.user.email.trim().toLowerCase();
+      setState(() {
+        _sendPasswordReset = false;
+        _message = [
+          'Profile saved.',
+          if (emailChanged)
+            'A verification email was sent before the email changes.',
+          if (passwordResetRequested) 'A password reset email was sent.',
+        ].join(' ');
+      });
+    } on FirebaseAuthException catch (error) {
+      if (!mounted) return;
+      setState(() => _error = _friendlyAuthError(error));
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _error = _cleanError(error.toString()));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  String _friendlyAuthError(FirebaseAuthException error) {
+    return switch (error.code) {
+      'requires-recent-login' =>
+        'For security, please log out and log in again before changing your email.',
+      'invalid-email' => 'Please enter a valid email address.',
+      'email-already-in-use' =>
+        'That email is already used by another account.',
+      'network-request-failed' =>
+        'Network connection failed. Please try again when you are online.',
+      _ => _cleanError(error.message ?? error.toString()),
+    };
+  }
 }
 
-class _HeaderProfileLine extends StatelessWidget {
-  const _HeaderProfileLine({required this.label, required this.value});
+class _ProfileDetailLine extends StatelessWidget {
+  const _ProfileDetailLine({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
 
   final String label;
   final String value;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Column(
@@ -495,10 +672,7 @@ class _HeaderProfileLine extends StatelessWidget {
         children: [
           Text(
             label,
-            style: TextStyle(
-              color: theme.colorScheme.primary,
-              fontWeight: FontWeight.w700,
-            ),
+            style: TextStyle(color: color, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 2),
           Text(value.isEmpty ? '-' : value),
@@ -506,6 +680,14 @@ class _HeaderProfileLine extends StatelessWidget {
       ),
     );
   }
+}
+
+String _cleanError(String message) {
+  return message
+      .replaceFirst('Bad state: ', '')
+      .replaceFirst('Exception: ', '')
+      .replaceFirst(RegExp(r'^\[firebase_auth/[^]]+\]\s*'), '')
+      .trim();
 }
 
 class _AdminSidebar extends StatelessWidget {
@@ -902,7 +1084,8 @@ class _ScannerAccountDrawer extends StatelessWidget {
                 Navigator.of(context).pop();
                 showDialog<void>(
                   context: context,
-                  builder: (_) => _ScannerProfileDialog(user: user),
+                  builder: (_) =>
+                      _EditableProfileDialog(user: user, scannerStyle: true),
                 );
               },
             ),
@@ -936,67 +1119,6 @@ class _ScannerAccountDrawer extends StatelessWidget {
   }
 }
 
-class _ScannerProfileDialog extends StatelessWidget {
-  const _ScannerProfileDialog({required this.user});
-
-  final AppUser user;
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Profile'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _ProfileLine(label: 'Name', value: user.fullName),
-          _ProfileLine(label: 'Email', value: user.email),
-          _ProfileLine(label: 'Role', value: user.role.label),
-          _ProfileLine(label: 'Status', value: user.status.label),
-        ],
-      ),
-      actions: [
-        FilledButton(
-          style: FilledButton.styleFrom(
-            backgroundColor: ScannerTheme.primary,
-            foregroundColor: Colors.white,
-          ),
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Close'),
-        ),
-      ],
-    );
-  }
-}
-
-class _ProfileLine extends StatelessWidget {
-  const _ProfileLine({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              color: ScannerTheme.primary,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(value.isEmpty ? '-' : value),
-        ],
-      ),
-    );
-  }
-}
-
 class _ScannerLogoutDialog extends StatelessWidget {
   const _ScannerLogoutDialog();
 
@@ -1015,6 +1137,38 @@ class _ScannerLogoutDialog extends StatelessWidget {
             backgroundColor: ScannerTheme.primary,
             foregroundColor: Colors.white,
           ),
+          onPressed: () => Navigator.of(context).pop(true),
+          child: const Text('Logout'),
+        ),
+      ],
+    );
+  }
+}
+
+Future<void> _confirmAndLogout(BuildContext context) async {
+  final app = AppScope.of(context);
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (_) => const _LogoutConfirmationDialog(),
+  );
+  if (confirmed != true || !context.mounted) return;
+  await app.logout();
+}
+
+class _LogoutConfirmationDialog extends StatelessWidget {
+  const _LogoutConfirmationDialog();
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Logout'),
+      content: const Text('Are you sure you want to logout?'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
           onPressed: () => Navigator.of(context).pop(true),
           child: const Text('Logout'),
         ),

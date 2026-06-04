@@ -51,6 +51,26 @@ class _TeachersPageState extends State<TeachersPage> {
       title: 'Teachers',
       actions: [
         OutlinedButton.icon(
+          icon: const Icon(Icons.archive_outlined),
+          label: const Text('Archives'),
+          onPressed: () => showDialog<void>(
+            context: context,
+            builder: (_) => const ArchivedRecordsDialog(
+              title: 'Archived Teachers',
+              collection: 'teachers',
+              schoolYearScoped: true,
+              columns: [
+                'teacherId',
+                'fullName',
+                'birthdate',
+                'address',
+                'contactNumber',
+                'archivedAt',
+              ],
+            ),
+          ),
+        ),
+        OutlinedButton.icon(
           icon: const Icon(Icons.upload_file_outlined),
           label: const Text('Import teachers'),
           onPressed: () => showDialog<void>(

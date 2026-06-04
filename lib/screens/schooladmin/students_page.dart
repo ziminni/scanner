@@ -35,6 +35,25 @@ class _StudentsPageState extends State<StudentsPage> {
       title: 'Students',
       actions: [
         OutlinedButton.icon(
+          icon: const Icon(Icons.archive_outlined),
+          label: const Text('Archives'),
+          onPressed: () => showDialog<void>(
+            context: context,
+            builder: (_) => const ArchivedRecordsDialog(
+              title: 'Archived Students',
+              collection: 'students',
+              schoolYearScoped: true,
+              columns: [
+                'lrn',
+                'fullName',
+                'birthdate',
+                'section',
+                'archivedAt',
+              ],
+            ),
+          ),
+        ),
+        OutlinedButton.icon(
           icon: const Icon(Icons.upload_file_outlined),
           label: const Text('Import students'),
           onPressed: () => showDialog<void>(

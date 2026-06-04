@@ -40,9 +40,13 @@ class AuthService {
       }
       return bootstrapped;
     }
-    final appUser = AppUser.fromDoc(doc);
+    final appUser = await _syncVerifiedEmail(user, AppUser.fromDoc(doc));
     if (_isWebScannerAccount(appUser)) {
       await logout(reason: 'scanner_web_access_blocked');
+      return null;
+    }
+    if (_isMobileAdminAccount(appUser)) {
+      await logout(reason: 'admin_mobile_access_blocked');
       return null;
     }
     if (!appUser.isActive) {
@@ -106,7 +110,10 @@ class AuthService {
       );
     }
 
-    final appUser = AppUser.fromDoc(doc);
+    final appUser = await _syncVerifiedEmail(
+      credential.user!,
+      AppUser.fromDoc(doc),
+    );
     if (_isWebScannerAccount(appUser)) {
       await _auditService.record(
         action: 'failed_login_scanner_web_blocked',
@@ -118,6 +125,19 @@ class AuthService {
       throw FirebaseAuthException(
         code: 'scanner-web-blocked',
         message: 'Staff Scanner accounts can only sign in on the mobile app.',
+      );
+    }
+    if (_isMobileAdminAccount(appUser)) {
+      await _auditService.record(
+        action: 'failed_login_admin_mobile_blocked',
+        actorId: uid,
+        actorName: appUser.fullName,
+      );
+      await _auth.signOut();
+      await _clearCachedUserProfile();
+      throw FirebaseAuthException(
+        code: 'admin-mobile-blocked',
+        message: 'Administrator accounts can only sign in on the web system.',
       );
     }
     if (!appUser.isActive) {
@@ -174,6 +194,108 @@ class AuthService {
     await _clearCachedUserProfile();
   }
 
+  Future<AppUser> updateCurrentUserProfile({
+    required String fullName,
+    required String email,
+    required bool sendPasswordReset,
+  }) async {
+    final current = _auth.currentUser;
+    if (current == null) {
+      throw FirebaseAuthException(
+        code: 'not-signed-in',
+        message: 'Please log in again before updating your profile.',
+      );
+    }
+
+    final trimmedName = fullName.trim();
+    final normalizedEmail = email.trim().toLowerCase();
+    if (trimmedName.isEmpty) {
+      throw FirebaseAuthException(
+        code: 'invalid-display-name',
+        message: 'Name is required.',
+      );
+    }
+    if (!normalizedEmail.contains('@')) {
+      throw FirebaseAuthException(
+        code: 'invalid-email',
+        message: 'Please enter a valid email address.',
+      );
+    }
+
+    final docRef = _firestore.collection('users').doc(current.uid);
+    final snapshot = await docRef.get();
+    if (!snapshot.exists) {
+      throw FirebaseAuthException(
+        code: 'profile-missing',
+        message: 'No role profile is assigned to this account.',
+      );
+    }
+    final existing = AppUser.fromDoc(snapshot);
+
+    await current.updateDisplayName(trimmedName);
+
+    var passwordResetSent = false;
+    if (sendPasswordReset) {
+      await _auth.sendPasswordResetEmail(email: existing.email);
+      passwordResetSent = true;
+    }
+
+    final emailChanged = normalizedEmail != existing.email.toLowerCase();
+    var emailVerificationSent = false;
+    if (emailChanged) {
+      await current.verifyBeforeUpdateEmail(normalizedEmail);
+      emailVerificationSent = true;
+    }
+
+    await docRef.set({
+      'fullName': trimmedName,
+      if (emailChanged) 'pendingEmail': normalizedEmail,
+      if (!emailChanged) 'pendingEmail': FieldValue.delete(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+
+    await _auditService.record(
+      action: 'profile_updated',
+      actorId: current.uid,
+      actorName: trimmedName,
+      target: existing.email,
+      metadata: {
+        'emailChangeRequested': emailChanged,
+        'emailVerificationSent': emailVerificationSent,
+        'passwordResetSent': passwordResetSent,
+      },
+    );
+
+    final updatedSnapshot = await docRef.get();
+    final updated = AppUser.fromDoc(updatedSnapshot);
+    await _cacheUserProfile(updated);
+    return updated;
+  }
+
+  Future<AppUser> _syncVerifiedEmail(User firebaseUser, AppUser appUser) async {
+    final authEmail = firebaseUser.email?.trim().toLowerCase();
+    if (authEmail == null ||
+        authEmail.isEmpty ||
+        authEmail == appUser.email.toLowerCase()) {
+      return appUser;
+    }
+    await _firestore.collection('users').doc(firebaseUser.uid).set({
+      'email': authEmail,
+      'pendingEmail': FieldValue.delete(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+    return AppUser(
+      id: appUser.id,
+      email: authEmail,
+      fullName: appUser.fullName,
+      role: appUser.role,
+      status: appUser.status,
+      schoolId: appUser.schoolId,
+      createdAt: appUser.createdAt,
+      lastLoginAt: appUser.lastLoginAt,
+    );
+  }
+
   Future<AppUser?> _bootstrapSystemAdminProfile(User user) async {
     final email = user.email?.toLowerCase();
     if (user.uid != _bootstrapSystemAdminUid ||
@@ -226,6 +348,7 @@ class AuthService {
     if (decoded['id'] != uid) return null;
     final cached = AppUser.fromMap(uid, decoded);
     if (_isWebScannerAccount(cached)) return null;
+    if (_isMobileAdminAccount(cached)) return null;
     return cached.isActive ? cached : null;
   }
 
@@ -238,7 +361,14 @@ class AuthService {
     return kIsWeb && user.role == UserRole.staffScanner;
   }
 
+  bool _isMobileAdminAccount(AppUser user) {
+    return !kIsWeb && user.role != UserRole.staffScanner;
+  }
+
   bool canAccess(AppUser user, String pageId) {
+    if (_isWebScannerAccount(user) || _isMobileAdminAccount(user)) {
+      return false;
+    }
     final allowed = switch (user.role) {
       UserRole.systemAdministrator => _systemAdminPages,
       UserRole.schoolAdministrator => _schoolAdminPages,
@@ -254,7 +384,6 @@ class AuthService {
     'settings',
     'database',
     'archives',
-    'scanner',
     'logs',
   };
 

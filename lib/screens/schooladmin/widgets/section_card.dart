@@ -17,8 +17,6 @@ class _SectionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final name = data['name'] as String? ?? 'Untitled section';
-    final adviser = data['adviser'] as String? ?? '';
-    final adviserText = _formatAdviserName(adviser);
     final gradeLevel = data['gradeLevel'] as String? ?? '';
     final gradeText = gradeLevel.trim().isEmpty
         ? '-'
@@ -64,13 +62,12 @@ class _SectionCard extends StatelessWidget {
                           case _SectionCardAction.archive:
                             onArchive();
                           case _SectionCardAction.downloadQr:
-                            break;
+                            _downloadStudentQrZip(context, data);
                         }
                       },
-                      itemBuilder: (context) => const [
-                        PopupMenuItem(
+                      itemBuilder: (context) => [
+                        const PopupMenuItem(
                           value: _SectionCardAction.downloadQr,
-                          enabled: false,
                           child: ListTile(
                             dense: true,
                             leading: Icon(Icons.qr_code_2_outlined),
@@ -100,10 +97,7 @@ class _SectionCard extends StatelessWidget {
                 const SizedBox(height: 8),
                 _CardLine(icon: Icons.school_outlined, value: gradeText),
                 const SizedBox(height: 6),
-                _CardLine(
-                  icon: Icons.person_outline,
-                  value: adviserText.isEmpty ? 'No adviser' : adviserText,
-                ),
+                _SectionAdviserLine(section: data),
                 const SizedBox(height: 6),
                 FutureBuilder(
                   future: app.attendance.activeSchoolYear(),
@@ -140,7 +134,49 @@ class _SectionCard extends StatelessWidget {
     );
   }
 
-  String _formatAdviserName(String value) {
+  Future<void> _downloadStudentQrZip(
+    BuildContext context,
+    Map<String, dynamic> section,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final app = AppScope.of(context);
+    final overlay = Overlay.of(context, rootOverlay: true);
+    final progress = ValueNotifier(
+      const SectionQrExportProgress(current: 0, total: 0),
+    );
+    final overlayEntry = OverlayEntry(
+      builder: (_) => _SectionQrExportPanel(progress: progress),
+    );
+    overlay.insert(overlayEntry);
+    try {
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+      await SectionQrExporter(app).downloadSectionZip(
+        section,
+        onProgress: (value) => progress.value = value,
+      );
+      progress.value = progress.value.asDone();
+      await Future<void>.delayed(const Duration(milliseconds: 900));
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Student QR ZIP downloaded.')),
+      );
+    } catch (error) {
+      progress.value = progress.value.asError(_friendlyDownloadError(error));
+      await Future<void>.delayed(const Duration(seconds: 2));
+      messenger.showSnackBar(
+        SnackBar(content: Text(_friendlyDownloadError(error))),
+      );
+    } finally {
+      overlayEntry.remove();
+      progress.dispose();
+    }
+  }
+
+  String _friendlyDownloadError(Object error) {
+    final message = error.toString().replaceFirst('Exception: ', '').trim();
+    return message.isEmpty ? 'Unable to download student QR ZIP.' : message;
+  }
+
+  static String formatAdviserName(String value) {
     final raw = value.trim();
     if (raw.isEmpty) return '';
     final commaParts = raw
@@ -164,6 +200,156 @@ class _SectionCard extends StatelessWidget {
       return '$lastName, $firstName$middleInitial';
     }
     return raw;
+  }
+}
+
+class _SectionAdviserLine extends StatelessWidget {
+  const _SectionAdviserLine({required this.section});
+
+  final Map<String, dynamic> section;
+
+  @override
+  Widget build(BuildContext context) {
+    final app = AppScope.of(context);
+    final adviserDocId = (section['adviserDocId'] as String? ?? '').trim();
+    if (adviserDocId.isEmpty) {
+      return const _CardLine(icon: Icons.person_outline, value: 'No adviser');
+    }
+
+    return FutureBuilder(
+      future: app.attendance.activeSchoolYear(),
+      builder: (context, schoolYearSnapshot) {
+        final schoolYear = schoolYearSnapshot.data;
+        if (schoolYear == null) {
+          return const _CardLine(
+            icon: Icons.person_outline,
+            value: 'No adviser',
+          );
+        }
+
+        return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+          stream: app.repository
+              .schoolYearCollection(schoolYear.id, 'teachers')
+              .doc(adviserDocId)
+              .snapshots(),
+          builder: (context, snapshot) {
+            final data = snapshot.data?.data();
+            if (data == null || data['archived'] == true) {
+              return const _CardLine(
+                icon: Icons.person_outline,
+                value: 'No adviser',
+              );
+            }
+            final name = [
+              data['lastName'] as String? ?? '',
+              data['firstName'] as String? ?? '',
+              data['middleName'] as String? ?? '',
+            ].where((part) => part.trim().isNotEmpty).join(', ');
+            final adviserText = _SectionCard.formatAdviserName(name);
+            return _CardLine(
+              icon: Icons.person_outline,
+              value: adviserText.isEmpty ? 'No adviser' : adviserText,
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _SectionQrExportPanel extends StatelessWidget {
+  const _SectionQrExportPanel({required this.progress});
+
+  final ValueNotifier<SectionQrExportProgress> progress;
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      right: 24,
+      bottom: 24,
+      child: Material(
+        elevation: 14,
+        borderRadius: BorderRadius.circular(8),
+        color: Theme.of(context).colorScheme.surface,
+        child: Container(
+          width: 360,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: Theme.of(context).colorScheme.outlineVariant,
+            ),
+          ),
+          child: ValueListenableBuilder<SectionQrExportProgress>(
+            valueListenable: progress,
+            builder: (context, value, _) {
+              final hasError = value.errorMessage.isNotEmpty;
+              final title = hasError
+                  ? 'Download failed'
+                  : value.done
+                  ? 'Download ready'
+                  : 'Preparing student QR ZIP';
+              final status = hasError
+                  ? value.errorMessage
+                  : value.done
+                  ? 'Starting ZIP download...'
+                  : value.total == 0
+                  ? 'Loading students...'
+                  : 'Generated ${value.current} of ${value.total} QR IDs';
+
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        hasError
+                            ? Icons.error_outline
+                            : value.done
+                            ? Icons.check_circle_outline
+                            : Icons.archive_outlined,
+                        color: hasError
+                            ? Theme.of(context).colorScheme.error
+                            : Theme.of(context).colorScheme.primary,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          title,
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  LinearProgressIndicator(
+                    value: hasError || value.done ? 1 : value.value,
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    status,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  if (value.studentName.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      value.studentName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+    );
   }
 }
 

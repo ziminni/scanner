@@ -94,10 +94,9 @@ class _SchoolYearPageState extends State<SchoolYearPage> {
                 return const _CardListSkeleton();
               }
 
-              final schoolYears = (snapshot.data?.docs ?? [])
-                  .map(SchoolYear.fromDoc)
-                  .toList()
-                ..sort(_sortDescending);
+              final schoolYears =
+                  (snapshot.data?.docs ?? []).map(SchoolYear.fromDoc).toList()
+                    ..sort(_sortDescending);
 
               if (schoolYears.isEmpty) {
                 return const EmptyState(
@@ -107,13 +106,11 @@ class _SchoolYearPageState extends State<SchoolYearPage> {
                 );
               }
 
-              final hasActive = schoolYears.any((s) => s.isActive);
-
               return ListView.separated(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: schoolYears.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 12),
+                separatorBuilder: (_, _) => const SizedBox(height: 12),
                 itemBuilder: (context, index) {
                   final sy = schoolYears[index];
                   return _SchoolYearCard(
@@ -150,10 +147,7 @@ class _SchoolYearPageState extends State<SchoolYearPage> {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _SchoolYearCard extends StatefulWidget {
-  const _SchoolYearCard({
-    required this.schoolYear,
-    this.onArchive,
-  });
+  const _SchoolYearCard({required this.schoolYear, this.onArchive});
 
   final SchoolYear schoolYear;
   final VoidCallback? onArchive;
@@ -175,9 +169,10 @@ class _SchoolYearCardState extends State<_SchoolYearCard>
       vsync: this,
       duration: const Duration(milliseconds: 200),
     );
-    _chevron = Tween<double>(begin: 0, end: 0.5).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
-    );
+    _chevron = Tween<double>(
+      begin: 0,
+      end: 0.5,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
   }
 
   @override
@@ -205,10 +200,7 @@ class _SchoolYearCardState extends State<_SchoolYearCard>
             onTap: _toggle,
             borderRadius: BorderRadius.circular(12),
             child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 14,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               child: Row(
                 children: [
                   // Left — name + optional "Active" badge + date range
@@ -335,10 +327,7 @@ class _SchoolYearMeta extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _SchoolYearDetails extends StatelessWidget {
-  const _SchoolYearDetails({
-    required this.schoolYear,
-    this.onArchive,
-  });
+  const _SchoolYearDetails({required this.schoolYear, this.onArchive});
 
   final SchoolYear schoolYear;
   final VoidCallback? onArchive;
@@ -463,20 +452,20 @@ class _StatusPill extends StatelessWidget {
   Widget build(BuildContext context) {
     final (bg, fg, label) = switch (status) {
       _SYStatus.active => (
-          const Color(0xFF03913F).withAlpha(28),
-          const Color(0xFF03913F),
-          'active',
-        ),
+        const Color(0xFF03913F).withAlpha(28),
+        const Color(0xFF03913F),
+        'active',
+      ),
       _SYStatus.completed => (
-          const Color(0xFF6B7FD4).withAlpha(28),
-          const Color(0xFF4A5BA8),
-          'completed',
-        ),
+        const Color(0xFF6B7FD4).withAlpha(28),
+        const Color(0xFF4A5BA8),
+        'completed',
+      ),
       _SYStatus.inactive => (
-          Colors.grey.withAlpha(28),
-          Colors.grey.shade700,
-          'inactive',
-        ),
+        Colors.grey.withAlpha(28),
+        Colors.grey.shade700,
+        'inactive',
+      ),
     };
 
     return Container(
@@ -487,11 +476,7 @@ class _StatusPill extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: TextStyle(
-          color: fg,
-          fontWeight: FontWeight.w600,
-          fontSize: 12,
-        ),
+        style: TextStyle(color: fg, fontWeight: FontWeight.w600, fontSize: 12),
       ),
     );
   }
@@ -626,13 +611,13 @@ class _Box extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        width: w,
-        height: h,
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(6),
-        ),
-      );
+    width: w,
+    height: h,
+    decoration: BoxDecoration(
+      color: color,
+      borderRadius: BorderRadius.circular(6),
+    ),
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
