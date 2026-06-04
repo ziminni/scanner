@@ -9,6 +9,8 @@ class AttendanceLogsTable extends StatefulWidget {
     this.typeFilter = '',
     this.statusFilter = '',
     this.syncFilter = '',
+    this.sectionFilter = '',
+    this.teacherScheduleFilter = '',
   });
 
   final int limit;
@@ -17,6 +19,8 @@ class AttendanceLogsTable extends StatefulWidget {
   final String typeFilter;
   final String statusFilter;
   final String syncFilter;
+  final String sectionFilter;
+  final String teacherScheduleFilter;
 
   @override
   State<AttendanceLogsTable> createState() => _AttendanceLogsTableState();
@@ -36,7 +40,9 @@ class _AttendanceLogsTableState extends State<AttendanceLogsTable> {
         oldWidget.roleFilter != widget.roleFilter ||
         oldWidget.typeFilter != widget.typeFilter ||
         oldWidget.statusFilter != widget.statusFilter ||
-        oldWidget.syncFilter != widget.syncFilter) {
+        oldWidget.syncFilter != widget.syncFilter ||
+        oldWidget.sectionFilter != widget.sectionFilter ||
+        oldWidget.teacherScheduleFilter != widget.teacherScheduleFilter) {
       _currentPage = 0;
     }
   }
@@ -44,6 +50,36 @@ class _AttendanceLogsTableState extends State<AttendanceLogsTable> {
   @override
   Widget build(BuildContext context) {
     final app = AppScope.of(context);
+    if (widget.teacherScheduleFilter.isNotEmpty) {
+      return FutureBuilder<SchoolYear?>(
+        future: app.attendance.activeSchoolYear(),
+        builder: (context, schoolYearSnapshot) {
+          final schoolYear = schoolYearSnapshot.data;
+          if (schoolYear == null) {
+            return const EmptyState(title: 'No attendance logs found');
+          }
+          return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            stream: app.repository.activeTeachersStream(schoolYear.id),
+            builder: (context, teachersSnapshot) {
+              final teacherSchedules = {
+                for (final doc in teachersSnapshot.data?.docs ?? [])
+                  (doc.data()['teacherId'] as String? ?? '').trim():
+                      _teacherSchedule(doc.data()),
+              }..removeWhere((teacherId, _) => teacherId.isEmpty);
+              return _buildLogs(context, app, teacherSchedules);
+            },
+          );
+        },
+      );
+    }
+    return _buildLogs(context, app, const {});
+  }
+
+  Widget _buildLogs(
+    BuildContext context,
+    AppController app,
+    Map<String, String> teacherSchedules,
+  ) {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: app.attendance.logsStream(limit: widget.limit),
       builder: (context, snapshot) {
@@ -65,6 +101,14 @@ class _AttendanceLogsTableState extends State<AttendanceLogsTable> {
           }
           if (widget.syncFilter.isNotEmpty &&
               log.syncStatus.label != widget.syncFilter) {
+            return false;
+          }
+          if (widget.sectionFilter.isNotEmpty &&
+              log.section != widget.sectionFilter) {
+            return false;
+          }
+          if (widget.teacherScheduleFilter.isNotEmpty &&
+              teacherSchedules[log.personId] != widget.teacherScheduleFilter) {
             return false;
           }
           return query.isEmpty ||
@@ -158,6 +202,12 @@ class _AttendanceLogsTableState extends State<AttendanceLogsTable> {
       },
     );
   }
+
+  static String _teacherSchedule(Map<String, dynamic> data) {
+    final timeIn = data['assignedTimeIn'] as String? ?? '07:00';
+    final timeOut = data['assignedTimeOut'] as String? ?? '17:00';
+    return '$timeIn - $timeOut';
+  }
 }
 
 class GatePassLogsTable extends StatelessWidget {
@@ -167,16 +217,50 @@ class GatePassLogsTable extends StatelessWidget {
     this.search = '',
     this.roleFilter = '',
     this.syncFilter = '',
+    this.sectionFilter = '',
+    this.teacherScheduleFilter = '',
   });
 
   final int limit;
   final String search;
   final String roleFilter;
   final String syncFilter;
+  final String sectionFilter;
+  final String teacherScheduleFilter;
 
   @override
   Widget build(BuildContext context) {
     final app = AppScope.of(context);
+    if (teacherScheduleFilter.isNotEmpty) {
+      return FutureBuilder<SchoolYear?>(
+        future: app.attendance.activeSchoolYear(),
+        builder: (context, schoolYearSnapshot) {
+          final schoolYear = schoolYearSnapshot.data;
+          if (schoolYear == null) {
+            return const EmptyState(title: 'No gate pass logs found');
+          }
+          return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            stream: app.repository.activeTeachersStream(schoolYear.id),
+            builder: (context, teachersSnapshot) {
+              final teacherSchedules = {
+                for (final doc in teachersSnapshot.data?.docs ?? [])
+                  (doc.data()['teacherId'] as String? ?? '').trim():
+                      _teacherSchedule(doc.data()),
+              }..removeWhere((teacherId, _) => teacherId.isEmpty);
+              return _buildLogs(context, app, teacherSchedules);
+            },
+          );
+        },
+      );
+    }
+    return _buildLogs(context, app, const {});
+  }
+
+  Widget _buildLogs(
+    BuildContext context,
+    AppController app,
+    Map<String, String> teacherSchedules,
+  ) {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: app.attendance.gatePassLogsStream(limit: limit),
       builder: (context, snapshot) {
@@ -188,6 +272,13 @@ class GatePassLogsTable extends StatelessWidget {
             return false;
           }
           if (syncFilter.isNotEmpty && log.syncStatus.label != syncFilter) {
+            return false;
+          }
+          if (sectionFilter.isNotEmpty && log.section != sectionFilter) {
+            return false;
+          }
+          if (teacherScheduleFilter.isNotEmpty &&
+              teacherSchedules[log.personId] != teacherScheduleFilter) {
             return false;
           }
           return query.isEmpty ||
@@ -243,6 +334,12 @@ class GatePassLogsTable extends StatelessWidget {
         );
       },
     );
+  }
+
+  static String _teacherSchedule(Map<String, dynamic> data) {
+    final timeIn = data['assignedTimeIn'] as String? ?? '07:00';
+    final timeOut = data['assignedTimeOut'] as String? ?? '17:00';
+    return '$timeIn - $timeOut';
   }
 
   String _durationText(int minutes) {

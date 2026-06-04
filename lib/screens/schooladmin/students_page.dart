@@ -82,44 +82,25 @@ class _StudentsPageState extends State<StudentsPage> {
                       .toSet()
                       .toList()
                     ..sort();
+              final sectionOptions = ['Unassigned', ...sections];
               if (_sectionFilter.isNotEmpty &&
-                  !sections.contains(_sectionFilter)) {
+                  !sectionOptions.contains(_sectionFilter)) {
                 _sectionFilter = '';
               }
 
-              return LayoutBuilder(
-                builder: (context, constraints) {
-                  final searchWidth = (constraints.maxWidth - 192)
-                      .clamp(360.0, 720.0)
-                      .toDouble();
-                  return Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      SizedBox(
-                        width: searchWidth,
-                        child: TextField(
-                          controller: _search,
-                          decoration: const InputDecoration(
-                            prefixIcon: Icon(Icons.search),
-                            labelText: 'Search student name, LRN, section',
-                          ),
-                          onChanged: (_) => setState(() {}),
-                        ),
-                      ),
-                      _FilterSelect(
-                        label: 'Section',
-                        value: _sectionFilter,
-                        options: sections,
-                        onChanged: (value) =>
-                            setState(() => _sectionFilter = value),
-                      ),
-                    ],
-                  );
-                },
+              return _StudentsFilterBar(
+                search: _search,
+                sectionFilter: _sectionFilter,
+                sections: sectionOptions,
+                onSearchChanged: () => setState(() {}),
+                onSectionChanged: (value) =>
+                    setState(() => _sectionFilter = value),
               );
             },
+          ),
+          const SizedBox(height: 12),
+          _UnassignedStudentsNotice(
+            onView: () => setState(() => _sectionFilter = 'Unassigned'),
           ),
           const SizedBox(height: 12),
           CollectionTable(
@@ -132,6 +113,143 @@ class _StudentsPageState extends State<StudentsPage> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _StudentsFilterBar extends StatelessWidget {
+  const _StudentsFilterBar({
+    required this.search,
+    required this.sectionFilter,
+    required this.sections,
+    required this.onSearchChanged,
+    required this.onSectionChanged,
+  });
+
+  final TextEditingController search;
+  final String sectionFilter;
+  final List<String> sections;
+  final VoidCallback onSearchChanged;
+  final ValueChanged<String> onSectionChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 560;
+        final searchWidth = compact
+            ? constraints.maxWidth
+            : (constraints.maxWidth - 172).clamp(360.0, 720.0).toDouble();
+        return SizedBox(
+          width: constraints.maxWidth,
+          child: Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            alignment: WrapAlignment.center,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              SizedBox(
+                width: searchWidth,
+                child: TextField(
+                  controller: search,
+                  decoration: const InputDecoration(
+                    prefixIcon: Icon(Icons.search),
+                    labelText: 'Search student name, LRN, section',
+                  ),
+                  onChanged: (_) => onSearchChanged(),
+                ),
+              ),
+              _FilterSelect(
+                label: 'Section',
+                value: sectionFilter,
+                options: sections,
+                onChanged: onSectionChanged,
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _UnassignedStudentsNotice extends StatelessWidget {
+  const _UnassignedStudentsNotice({required this.onView});
+
+  final VoidCallback onView;
+
+  @override
+  Widget build(BuildContext context) {
+    final app = AppScope.of(context);
+    final theme = Theme.of(context);
+    return FutureBuilder(
+      future: app.attendance.activeSchoolYear(),
+      builder: (context, schoolYearSnapshot) {
+        final schoolYear = schoolYearSnapshot.data;
+        if (schoolYear == null) return const SizedBox.shrink();
+
+        return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: app.repository
+              .schoolYearCollection(schoolYear.id, 'students')
+              .where('archived', isEqualTo: false)
+              .snapshots(),
+          builder: (context, snapshot) {
+            final unassignedCount = (snapshot.data?.docs ?? []).where((doc) {
+              final section = (doc.data()['section'] as String? ?? '').trim();
+              return section.isEmpty;
+            }).length;
+            if (unassignedCount == 0) return const SizedBox.shrink();
+
+            return Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.errorContainer.withAlpha(95),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: theme.colorScheme.error.withAlpha(70),
+                ),
+              ),
+              child: Wrap(
+                spacing: 12,
+                runSpacing: 10,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                alignment: WrapAlignment.spaceBetween,
+                children: [
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 720),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.warning_amber_outlined,
+                          color: theme.colorScheme.error,
+                        ),
+                        const SizedBox(width: 10),
+                        Flexible(
+                          child: Text(
+                            '$unassignedCount active ${unassignedCount == 1 ? 'student has' : 'students have'} no assigned section. Please assign ${unassignedCount == 1 ? 'this student' : 'them'} to a section.',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.colorScheme.onErrorContainer,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: onView,
+                    icon: const Icon(Icons.visibility_outlined),
+                    label: const Text('View unassigned'),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }

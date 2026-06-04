@@ -204,11 +204,6 @@ class _CollectionTableBodyState extends State<_CollectionTableBody> {
                             Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                IconButton(
-                                  tooltip: 'Archive',
-                                  icon: const Icon(Icons.archive_outlined),
-                                  onPressed: () => widget.onArchive(doc.id),
-                                ),
                                 if (widget.onEdit != null)
                                   IconButton(
                                     tooltip: 'Edit',
@@ -220,6 +215,11 @@ class _CollectionTableBodyState extends State<_CollectionTableBody> {
                                       widget.schoolYearId,
                                     ),
                                   ),
+                                IconButton(
+                                  tooltip: 'Archive',
+                                  icon: const Icon(Icons.archive_outlined),
+                                  onPressed: () => widget.onArchive(doc.id),
+                                ),
                               ],
                             ),
                           ),
@@ -265,6 +265,11 @@ class _CollectionTableBodyState extends State<_CollectionTableBody> {
     for (final entry in filters.entries) {
       final selected = entry.value.trim();
       if (selected.isEmpty) continue;
+      if (entry.key == 'section' && selected.toLowerCase() == 'unassigned') {
+        final rawSection = data[entry.key]?.toString().trim() ?? '';
+        if (rawSection.isNotEmpty) return false;
+        continue;
+      }
       final value = adminFormatValue(data[entry.key]).trim().toLowerCase();
       if (value != selected.toLowerCase()) return false;
     }

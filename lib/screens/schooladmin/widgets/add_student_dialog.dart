@@ -30,10 +30,37 @@ class _AddStudentDialogState extends State<_AddStudentDialog> {
     return AnimatedBuilder(
       animation: _viewModel,
       builder: (context, _) {
+        final theme = Theme.of(context);
         return AlertDialog(
-          title: const Text('Add student'),
-          content: SizedBox(
-            width: 720,
+          titlePadding: const EdgeInsets.fromLTRB(24, 22, 24, 0),
+          contentPadding: const EdgeInsets.fromLTRB(24, 16, 24, 12),
+          actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 18),
+          title: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withAlpha(24),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.school_outlined,
+                  color: theme.colorScheme.primary,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Add student',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 560),
             child: SingleChildScrollView(
               child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                 stream: _viewModel.sectionsStream,
@@ -51,13 +78,20 @@ class _AddStudentDialogState extends State<_AddStudentDialog> {
                     _viewModel.selectSection(null);
                   }
 
-                  return Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
+                  return Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      Text(
+                        'Register a student under the active school year and assign a section.',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 18),
                       for (final entry in _viewModel.controllers.entries)
-                        SizedBox(
-                          width: 220,
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 14),
                           child: entry.key == 'birthdate'
                               ? BirthdateField(
                                   value: _viewModel.birthdate,
@@ -65,45 +99,60 @@ class _AddStudentDialogState extends State<_AddStudentDialog> {
                                 )
                               : TextField(
                                   controller: entry.value,
+                                  enabled: !_viewModel.busy,
+                                  textInputAction: TextInputAction.next,
                                   decoration: InputDecoration(
-                                    labelText: adminLabel(entry.key),
+                                    labelText: _studentFieldLabel(entry.key),
+                                    prefixIcon: Icon(
+                                      _studentFieldIcon(entry.key),
+                                    ),
                                   ),
                                 ),
                         ),
-                      SizedBox(
-                        width: 220,
-                        child: DropdownButtonFormField<String>(
-                          initialValue: _viewModel.selectedSection,
-                          decoration: const InputDecoration(
-                            labelText: 'Section',
-                          ),
-                          hint: const Text('Select section'),
-                          items: [
-                            for (final section in sectionNames)
-                              DropdownMenuItem(
-                                value: section,
-                                child: Text(section),
-                              ),
-                          ],
-                          onChanged: sectionNames.isEmpty
-                              ? null
-                              : _viewModel.selectSection,
+                      DropdownButtonFormField<String>(
+                        initialValue: _viewModel.selectedSection,
+                        decoration: const InputDecoration(
+                          labelText: 'Section',
+                          prefixIcon: Icon(Icons.groups_outlined),
                         ),
+                        hint: const Text('Select section'),
+                        items: [
+                          for (final section in sectionNames)
+                            DropdownMenuItem(
+                              value: section,
+                              child: Text(section),
+                            ),
+                        ],
+                        onChanged: sectionNames.isEmpty || _viewModel.busy
+                            ? null
+                            : _viewModel.selectSection,
                       ),
                       if (sectionNames.isEmpty)
-                        const SizedBox(
-                          width: double.infinity,
+                        Padding(
+                          padding: const EdgeInsets.only(top: 12),
                           child: Text(
                             'Create a section first before adding students.',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
                           ),
                         ),
                       if (_viewModel.message != null)
-                        SizedBox(
-                          width: double.infinity,
-                          child: Text(
-                            _viewModel.message!,
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.error,
+                        Padding(
+                          padding: const EdgeInsets.only(top: 12),
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.errorContainer,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Text(
+                                _viewModel.message!,
+                                style: TextStyle(
+                                  color: theme.colorScheme.error,
+                                ),
+                              ),
                             ),
                           ),
                         ),
@@ -140,5 +189,24 @@ class _AddStudentDialogState extends State<_AddStudentDialog> {
         );
       },
     );
+  }
+
+  String _studentFieldLabel(String key) {
+    return switch (key) {
+      'lrn' => 'LRN',
+      'guardianName' => 'Guardian name',
+      'guardianContact' => 'Guardian contact',
+      _ => adminLabel(key),
+    };
+  }
+
+  IconData _studentFieldIcon(String key) {
+    return switch (key) {
+      'lrn' => Icons.badge_outlined,
+      'lastName' || 'firstName' || 'middleName' => Icons.person_outline,
+      'address' => Icons.home_outlined,
+      'guardianName' || 'guardianContact' => Icons.contact_phone_outlined,
+      _ => Icons.edit_outlined,
+    };
   }
 }

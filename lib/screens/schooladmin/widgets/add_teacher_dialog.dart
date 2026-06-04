@@ -34,42 +34,81 @@ class _AddTeacherDialogState extends State<_AddTeacherDialog> {
     return AnimatedBuilder(
       animation: _viewModel,
       builder: (context, _) {
+        final theme = Theme.of(context);
         return AlertDialog(
-          title: const Text('Add teacher'),
-          content: SizedBox(
-            width: 720,
+          titlePadding: const EdgeInsets.fromLTRB(24, 22, 24, 0),
+          contentPadding: const EdgeInsets.fromLTRB(24, 16, 24, 12),
+          actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 18),
+          title: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withAlpha(24),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.badge_outlined,
+                  color: theme.colorScheme.primary,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Add teacher',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 560),
             child: SingleChildScrollView(
-              child: Wrap(
-                spacing: 12,
-                runSpacing: 12,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  for (final entry in _viewModel.controllers.entries)
-                    SizedBox(width: 220, child: _fieldInput(entry)),
-                  SizedBox(
-                    width: 220,
-                    child: TimePickerField(
-                      label: 'Assigned Time In',
-                      value: _viewModel.assignedTimeIn,
-                      fallback: const TimeOfDay(hour: 7, minute: 0),
-                      onChanged: _viewModel.setAssignedTimeIn,
+                  Text(
+                    'Register a teacher and set the assigned attendance schedule.',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
-                  SizedBox(
-                    width: 220,
-                    child: TimePickerField(
-                      label: 'Assigned Time Out',
-                      value: _viewModel.assignedTimeOut,
-                      fallback: const TimeOfDay(hour: 17, minute: 0),
-                      onChanged: _viewModel.setAssignedTimeOut,
+                  const SizedBox(height: 18),
+                  for (final entry in _viewModel.controllers.entries)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 14),
+                      child: _fieldInput(entry),
                     ),
+                  TimePickerField(
+                    label: 'Assigned Time In',
+                    value: _viewModel.assignedTimeIn,
+                    fallback: const TimeOfDay(hour: 7, minute: 0),
+                    onChanged: _viewModel.setAssignedTimeIn,
+                  ),
+                  const SizedBox(height: 14),
+                  TimePickerField(
+                    label: 'Assigned Time Out',
+                    value: _viewModel.assignedTimeOut,
+                    fallback: const TimeOfDay(hour: 17, minute: 0),
+                    onChanged: _viewModel.setAssignedTimeOut,
                   ),
                   if (_viewModel.error != null)
-                    SizedBox(
-                      width: double.infinity,
-                      child: Text(
-                        _viewModel.error!,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
+                    Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.errorContainer,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Text(
+                            _viewModel.error!,
+                            style: TextStyle(color: theme.colorScheme.error),
+                          ),
                         ),
                       ),
                     ),
@@ -115,7 +154,30 @@ class _AddTeacherDialogState extends State<_AddTeacherDialog> {
     }
     return TextField(
       controller: entry.value,
-      decoration: InputDecoration(labelText: adminLabel(entry.key)),
+      enabled: !_viewModel.busy,
+      textInputAction: TextInputAction.next,
+      decoration: InputDecoration(
+        labelText: _teacherFieldLabel(entry.key),
+        prefixIcon: Icon(_teacherFieldIcon(entry.key)),
+      ),
     );
+  }
+
+  String _teacherFieldLabel(String key) {
+    return switch (key) {
+      'teacherId' => 'Teacher ID',
+      'contactNumber' => 'Contact number',
+      _ => adminLabel(key),
+    };
+  }
+
+  IconData _teacherFieldIcon(String key) {
+    return switch (key) {
+      'teacherId' => Icons.badge_outlined,
+      'lastName' || 'firstName' || 'middleName' => Icons.person_outline,
+      'address' => Icons.home_outlined,
+      'contactNumber' => Icons.phone_outlined,
+      _ => Icons.edit_outlined,
+    };
   }
 }

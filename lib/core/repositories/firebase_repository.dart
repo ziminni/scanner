@@ -146,6 +146,15 @@ class FirebaseRepository {
     ).limit(limit).get();
   }
 
+  Future<QuerySnapshot<Map<String, dynamic>>> attendanceLogsAll({
+    required String schoolYearId,
+  }) {
+    return schoolYearCollection(
+      schoolYearId,
+      'attendance_logs',
+    ).orderBy('timestamp', descending: false).get();
+  }
+
   Future<void> addGlobalRecord({
     required String collection,
     required Map<String, dynamic> data,

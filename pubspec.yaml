@@ -43,3 +43,5 @@ flutter:
   assets:
     - assets/images/school_logo.jpeg
     - assets/img/logo.jpg
+    - assets/templates/Students-template.xlsx
+    - assets/templates/Teachers-template.xlsx

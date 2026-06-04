@@ -89,55 +89,84 @@ class _TeachersPageState extends State<TeachersPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final searchWidth = (constraints.maxWidth - 192)
-                  .clamp(360.0, 720.0)
-                  .toDouble();
-              return Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  SizedBox(
-                    width: searchWidth,
-                    child: TextField(
-                      controller: _search,
-                      decoration: const InputDecoration(
-                        prefixIcon: Icon(Icons.search),
-                        labelText: 'Search teacher name, ID, or contact',
-                      ),
-                      onChanged: (_) => setState(() {}),
-                    ),
-                  ),
-                  SizedBox(
-                    width: 180,
-                    child: DropdownButtonFormField<String>(
-                      initialValue: _scheduleFilter,
-                      decoration: const InputDecoration(labelText: 'Schedule'),
-                      items: const [
-                        DropdownMenuItem(value: '', child: Text('All')),
-                        DropdownMenuItem(
-                          value: '07:00 - 16:00',
-                          child: Text('07:00 - 16:00'),
-                        ),
-                        DropdownMenuItem(
-                          value: '07:30 - 16:30',
-                          child: Text('07:30 - 16:30'),
-                        ),
-                      ],
-                      onChanged: (value) =>
-                          setState(() => _scheduleFilter = value ?? ''),
-                    ),
-                  ),
-                ],
-              );
-            },
+          _TeachersFilterBar(
+            search: _search,
+            scheduleFilter: _scheduleFilter,
+            onSearchChanged: () => setState(() {}),
+            onScheduleChanged: (value) =>
+                setState(() => _scheduleFilter = value),
           ),
           const SizedBox(height: 12),
           _TeachersTable(search: _search.text, scheduleFilter: _scheduleFilter),
         ],
       ),
+    );
+  }
+}
+
+class _TeachersFilterBar extends StatelessWidget {
+  const _TeachersFilterBar({
+    required this.search,
+    required this.scheduleFilter,
+    required this.onSearchChanged,
+    required this.onScheduleChanged,
+  });
+
+  final TextEditingController search;
+  final String scheduleFilter;
+  final VoidCallback onSearchChanged;
+  final ValueChanged<String> onScheduleChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 560;
+        final searchWidth = compact
+            ? constraints.maxWidth
+            : (constraints.maxWidth - 172).clamp(360.0, 720.0).toDouble();
+        return SizedBox(
+          width: constraints.maxWidth,
+          child: Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            alignment: WrapAlignment.center,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              SizedBox(
+                width: searchWidth,
+                child: TextField(
+                  controller: search,
+                  decoration: const InputDecoration(
+                    prefixIcon: Icon(Icons.search),
+                    labelText: 'Search teacher name, ID, or contact',
+                  ),
+                  onChanged: (_) => onSearchChanged(),
+                ),
+              ),
+              SizedBox(
+                width: 160,
+                child: DropdownButtonFormField<String>(
+                  initialValue: scheduleFilter,
+                  decoration: const InputDecoration(labelText: 'Schedule'),
+                  items: const [
+                    DropdownMenuItem(value: '', child: Text('All')),
+                    DropdownMenuItem(
+                      value: '07:00 - 16:00',
+                      child: Text('07:00 - 16:00'),
+                    ),
+                    DropdownMenuItem(
+                      value: '07:30 - 16:30',
+                      child: Text('07:30 - 16:30'),
+                    ),
+                  ],
+                  onChanged: (value) => onScheduleChanged(value ?? ''),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

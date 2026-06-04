@@ -43,18 +43,6 @@ class _SectionsPageState extends State<SectionsPage> {
     return AdminPage(
       title: 'Sections',
       actions: [
-        OutlinedButton.icon(
-          icon: const Icon(Icons.archive_outlined),
-          label: const Text('Archives'),
-          onPressed: () => showDialog<void>(
-            context: context,
-            builder: (_) => const ArchivedRecordsDialog(
-              title: 'Archived Sections',
-              collection: 'sections',
-              columns: ['name', 'gradeLevel', 'adviser', 'archivedAt'],
-            ),
-          ),
-        ),
         FilledButton.icon(
           icon: const Icon(Icons.add),
           label: const Text('Add section'),

@@ -16,17 +16,32 @@ class AttendanceLogsPage extends StatefulWidget {
   State<AttendanceLogsPage> createState() => _AttendanceLogsPageState();
 }
 
-class _AttendanceLogsPageState extends State<AttendanceLogsPage> {
+class _AttendanceLogsPageState extends State<AttendanceLogsPage>
+    with SingleTickerProviderStateMixin {
   final _search = TextEditingController();
-  String _roleFilter = '';
-  String _typeFilter = '';
-  String _statusFilter = '';
-  String _syncFilter = '';
+  late final TabController _tabController;
+  String _sectionFilter = '';
+  String _scheduleFilter = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(_handleTabChanged);
+  }
 
   @override
   void dispose() {
+    _tabController.removeListener(_handleTabChanged);
+    _tabController.dispose();
     _search.dispose();
     super.dispose();
+  }
+
+  void _handleTabChanged() {
+    if (!_tabController.indexIsChanging) {
+      setState(() {});
+    }
   }
 
   @override
@@ -39,46 +54,179 @@ class _AttendanceLogsPageState extends State<AttendanceLogsPage> {
             search: _search,
             searchLabel: 'Search name, ID, section, scanner',
             filters: [
-              _LogFilterSelect(
-                label: 'Role',
-                value: _roleFilter,
-                options: const ['Student', 'Teacher'],
-                onChanged: (value) => setState(() => _roleFilter = value),
-              ),
-              _LogFilterSelect(
-                label: 'Type',
-                value: _typeFilter,
-                options: const ['Time In', 'Time Out'],
-                onChanged: (value) => setState(() => _typeFilter = value),
-              ),
-              _LogFilterSelect(
-                label: 'Status',
-                value: _statusFilter,
-                options: AttendanceStatus.values
-                    .map((status) => status.label)
-                    .toList(),
-                onChanged: (value) => setState(() => _statusFilter = value),
-              ),
-              _LogFilterSelect(
-                label: 'Sync',
-                value: _syncFilter,
-                options: SyncStatus.values.map((sync) => sync.label).toList(),
-                onChanged: (value) => setState(() => _syncFilter = value),
+              _AttendanceContextFilter(
+                tabIndex: _tabController.index,
+                sectionValue: _sectionFilter,
+                scheduleValue: _scheduleFilter,
+                onSectionChanged: (value) =>
+                    setState(() => _sectionFilter = value),
+                onScheduleChanged: (value) =>
+                    setState(() => _scheduleFilter = value),
               ),
             ],
             onSearchChanged: () => setState(() {}),
           ),
           const SizedBox(height: 12),
-          AttendanceLogsTable(
-            limit: 200,
+          _AttendanceRoleTabs(
+            controller: _tabController,
             search: _search.text,
-            roleFilter: _roleFilter,
-            typeFilter: _typeFilter,
-            statusFilter: _statusFilter,
-            syncFilter: _syncFilter,
+            sectionFilter: _sectionFilter,
+            scheduleFilter: _scheduleFilter,
           ),
         ],
       ),
+    );
+  }
+}
+
+class _AttendanceRoleTabs extends StatelessWidget {
+  const _AttendanceRoleTabs({
+    required this.controller,
+    required this.search,
+    required this.sectionFilter,
+    required this.scheduleFilter,
+  });
+
+  final TabController controller;
+  final String search;
+  final String sectionFilter;
+  final String scheduleFilter;
+
+  @override
+  Widget build(BuildContext context) {
+    final tableHeight = (MediaQuery.sizeOf(context).height - 300)
+        .clamp(420.0, 900.0)
+        .toDouble();
+    return Column(
+      children: [
+        Material(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          child: TabBar(
+            controller: controller,
+            dividerColor: Colors.transparent,
+            labelColor: Theme.of(context).colorScheme.primary,
+            unselectedLabelColor: Theme.of(
+              context,
+            ).colorScheme.onSurfaceVariant,
+            indicatorSize: TabBarIndicatorSize.tab,
+            indicator: BoxDecoration(
+              color: Theme.of(
+                context,
+              ).colorScheme.primary.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            tabs: const [
+              Tab(icon: Icon(Icons.school_outlined), text: 'Students'),
+              Tab(icon: Icon(Icons.badge_outlined), text: 'Teachers'),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: tableHeight,
+          child: TabBarView(
+            controller: controller,
+            children: [
+              AttendanceLogsTable(
+                limit: 200,
+                search: search,
+                roleFilter: PersonRole.student.label,
+                sectionFilter: sectionFilter,
+              ),
+              AttendanceLogsTable(
+                limit: 200,
+                search: search,
+                roleFilter: PersonRole.teacher.label,
+                teacherScheduleFilter: scheduleFilter,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _AttendanceContextFilter extends StatelessWidget {
+  const _AttendanceContextFilter({
+    required this.tabIndex,
+    required this.sectionValue,
+    required this.scheduleValue,
+    required this.onSectionChanged,
+    required this.onScheduleChanged,
+  });
+
+  final int tabIndex;
+  final String sectionValue;
+  final String scheduleValue;
+  final ValueChanged<String> onSectionChanged;
+  final ValueChanged<String> onScheduleChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final app = AppScope.of(context);
+    if (tabIndex == 0) {
+      return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        stream: app.repository.activeSectionsStream(),
+        builder: (context, snapshot) {
+          final sections =
+              snapshot.data?.docs
+                  .map((doc) => (doc.data()['name'] as String? ?? '').trim())
+                  .where((name) => name.isNotEmpty)
+                  .toSet()
+                  .toList()
+                ?..sort();
+          final options = sections ?? const <String>[];
+          return _LogFilterSelect(
+            label: 'Section',
+            value: options.contains(sectionValue) ? sectionValue : '',
+            options: options,
+            onChanged: onSectionChanged,
+          );
+        },
+      );
+    }
+
+    return FutureBuilder<SchoolYear?>(
+      future: app.attendance.activeSchoolYear(),
+      builder: (context, schoolYearSnapshot) {
+        final schoolYear = schoolYearSnapshot.data;
+        if (schoolYear == null) {
+          return _LogFilterSelect(
+            label: 'Schedule',
+            value: '',
+            options: const [],
+            onChanged: onScheduleChanged,
+          );
+        }
+        return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: app.repository.activeTeachersStream(schoolYear.id),
+          builder: (context, snapshot) {
+            final schedules =
+                snapshot.data?.docs
+                    .map((doc) {
+                      final data = doc.data();
+                      final timeIn =
+                          data['assignedTimeIn'] as String? ?? '07:00';
+                      final timeOut =
+                          data['assignedTimeOut'] as String? ?? '17:00';
+                      return '$timeIn - $timeOut';
+                    })
+                    .where((schedule) => schedule.trim().isNotEmpty)
+                    .toSet()
+                    .toList()
+                  ?..sort();
+            final options = schedules ?? const <String>[];
+            return _LogFilterSelect(
+              label: 'Schedule',
+              value: options.contains(scheduleValue) ? scheduleValue : '',
+              options: options,
+              onChanged: onScheduleChanged,
+            );
+          },
+        );
+      },
     );
   }
 }
@@ -90,15 +238,32 @@ class GatePassLogsPage extends StatefulWidget {
   State<GatePassLogsPage> createState() => _GatePassLogsPageState();
 }
 
-class _GatePassLogsPageState extends State<GatePassLogsPage> {
+class _GatePassLogsPageState extends State<GatePassLogsPage>
+    with SingleTickerProviderStateMixin {
   final _search = TextEditingController();
-  String _roleFilter = '';
-  String _syncFilter = '';
+  late final TabController _tabController;
+  String _sectionFilter = '';
+  String _scheduleFilter = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(_handleTabChanged);
+  }
 
   @override
   void dispose() {
+    _tabController.removeListener(_handleTabChanged);
+    _tabController.dispose();
     _search.dispose();
     super.dispose();
+  }
+
+  void _handleTabChanged() {
+    if (!_tabController.indexIsChanging) {
+      setState(() {});
+    }
   }
 
   @override
@@ -111,30 +276,96 @@ class _GatePassLogsPageState extends State<GatePassLogsPage> {
             search: _search,
             searchLabel: 'Search name, ID, section, scanner, reason',
             filters: [
-              _LogFilterSelect(
-                label: 'Role',
-                value: _roleFilter,
-                options: const ['Student', 'Teacher'],
-                onChanged: (value) => setState(() => _roleFilter = value),
-              ),
-              _LogFilterSelect(
-                label: 'Sync',
-                value: _syncFilter,
-                options: SyncStatus.values.map((sync) => sync.label).toList(),
-                onChanged: (value) => setState(() => _syncFilter = value),
+              _AttendanceContextFilter(
+                tabIndex: _tabController.index,
+                sectionValue: _sectionFilter,
+                scheduleValue: _scheduleFilter,
+                onSectionChanged: (value) =>
+                    setState(() => _sectionFilter = value),
+                onScheduleChanged: (value) =>
+                    setState(() => _scheduleFilter = value),
               ),
             ],
             onSearchChanged: () => setState(() {}),
           ),
           const SizedBox(height: 12),
-          GatePassLogsTable(
-            limit: 200,
+          _GatePassRoleTabs(
+            controller: _tabController,
             search: _search.text,
-            roleFilter: _roleFilter,
-            syncFilter: _syncFilter,
+            sectionFilter: _sectionFilter,
+            scheduleFilter: _scheduleFilter,
           ),
         ],
       ),
+    );
+  }
+}
+
+class _GatePassRoleTabs extends StatelessWidget {
+  const _GatePassRoleTabs({
+    required this.controller,
+    required this.search,
+    required this.sectionFilter,
+    required this.scheduleFilter,
+  });
+
+  final TabController controller;
+  final String search;
+  final String sectionFilter;
+  final String scheduleFilter;
+
+  @override
+  Widget build(BuildContext context) {
+    final tableHeight = (MediaQuery.sizeOf(context).height - 300)
+        .clamp(420.0, 900.0)
+        .toDouble();
+    return Column(
+      children: [
+        Material(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          child: TabBar(
+            controller: controller,
+            dividerColor: Colors.transparent,
+            labelColor: Theme.of(context).colorScheme.primary,
+            unselectedLabelColor: Theme.of(
+              context,
+            ).colorScheme.onSurfaceVariant,
+            indicatorSize: TabBarIndicatorSize.tab,
+            indicator: BoxDecoration(
+              color: Theme.of(
+                context,
+              ).colorScheme.primary.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            tabs: const [
+              Tab(icon: Icon(Icons.school_outlined), text: 'Students'),
+              Tab(icon: Icon(Icons.badge_outlined), text: 'Teachers'),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: tableHeight,
+          child: TabBarView(
+            controller: controller,
+            children: [
+              GatePassLogsTable(
+                limit: 200,
+                search: search,
+                roleFilter: PersonRole.student.label,
+                sectionFilter: sectionFilter,
+              ),
+              GatePassLogsTable(
+                limit: 200,
+                search: search,
+                roleFilter: PersonRole.teacher.label,
+                teacherScheduleFilter: scheduleFilter,
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

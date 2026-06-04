@@ -34,39 +34,89 @@ class _AddSectionDialogState extends State<_AddSectionDialog> {
     return AnimatedBuilder(
       animation: _viewModel,
       builder: (context, _) {
+        final theme = Theme.of(context);
         return AlertDialog(
-          title: const Text('Add section'),
-          content: SizedBox(
-            width: 480,
+          titlePadding: const EdgeInsets.fromLTRB(24, 22, 24, 0),
+          contentPadding: const EdgeInsets.fromLTRB(24, 16, 24, 12),
+          actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 18),
+          title: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withAlpha(24),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.groups_outlined,
+                  color: theme.colorScheme.primary,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Add section',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
             child: SingleChildScrollView(
-              child: Wrap(
-                spacing: 12,
-                runSpacing: 12,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  Text(
+                    'Create a section and assign an adviser from the active school year.',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 18),
                   for (final entry in _viewModel.controllers.entries)
-                    SizedBox(
-                      width: 220,
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 14),
                       child: TextField(
                         controller: entry.value,
+                        enabled: !_viewModel.busy,
+                        keyboardType: entry.key == 'gradeLevel'
+                            ? TextInputType.number
+                            : TextInputType.text,
+                        textInputAction: TextInputAction.next,
                         decoration: InputDecoration(
-                          labelText: adminLabel(entry.key),
+                          labelText: entry.key == 'name'
+                              ? 'Section name'
+                              : adminLabel(entry.key),
+                          prefixIcon: Icon(
+                            entry.key == 'gradeLevel'
+                                ? Icons.school_outlined
+                                : Icons.class_outlined,
+                          ),
                         ),
                       ),
                     ),
-                  SizedBox(
-                    width: 220,
-                    child: _AdviserDropdown(
-                      selected: _viewModel.selectedAdviser,
-                      onChanged: _viewModel.setAdviser,
-                    ),
+                  _AdviserDropdown(
+                    selected: _viewModel.selectedAdviser,
+                    onChanged: _viewModel.busy ? (_) {} : _viewModel.setAdviser,
                   ),
                   if (_viewModel.error != null)
-                    SizedBox(
-                      width: double.infinity,
-                      child: Text(
-                        _viewModel.error!,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
+                    Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.errorContainer,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Text(
+                            _viewModel.error!,
+                            style: TextStyle(color: theme.colorScheme.error),
+                          ),
                         ),
                       ),
                     ),

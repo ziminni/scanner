@@ -280,16 +280,22 @@ class _AdminDesktopShellState extends State<_AdminDesktopShell> {
   void _toggleSidebar() {
     _sidebarContentTimer?.cancel();
     if (_sidebarCollapsed) {
-      setState(() => _sidebarCollapsed = false);
-      _sidebarContentTimer = Timer(const Duration(milliseconds: 170), () {
-        if (!mounted) return;
-        setState(() => _sidebarContentCollapsed = false);
-      });
+      _openSidebar();
       return;
     }
     setState(() {
       _sidebarContentCollapsed = true;
       _sidebarCollapsed = true;
+    });
+  }
+
+  void _openSidebar() {
+    _sidebarContentTimer?.cancel();
+    if (!_sidebarCollapsed && !_sidebarContentCollapsed) return;
+    setState(() => _sidebarCollapsed = false);
+    _sidebarContentTimer = Timer(const Duration(milliseconds: 170), () {
+      if (!mounted) return;
+      setState(() => _sidebarContentCollapsed = false);
     });
   }
 
@@ -304,6 +310,7 @@ class _AdminDesktopShellState extends State<_AdminDesktopShell> {
             collapsed: _sidebarCollapsed,
             contentCollapsed: _sidebarContentCollapsed,
             onSelected: (pageId) => context.go(AppRoutes.pathForPage(pageId)),
+            onOpenSidebar: _openSidebar,
           ),
           Expanded(
             child: Column(
@@ -720,6 +727,7 @@ class _AdminSidebar extends StatelessWidget {
     required this.collapsed,
     required this.contentCollapsed,
     required this.onSelected,
+    required this.onOpenSidebar,
   });
 
   final List<_NavItem> items;
@@ -727,6 +735,7 @@ class _AdminSidebar extends StatelessWidget {
   final bool collapsed;
   final bool contentCollapsed;
   final ValueChanged<String> onSelected;
+  final VoidCallback onOpenSidebar;
 
   @override
   Widget build(BuildContext context) {
@@ -814,6 +823,7 @@ class _AdminSidebar extends StatelessWidget {
                   currentPage: currentPage,
                   collapsed: contentCollapsed,
                   onSelected: onSelected,
+                  onOpenSidebar: onOpenSidebar,
                   sidebarWidth: sidebarWidth,
                 );
               },
@@ -875,12 +885,13 @@ class _HeaderSidebarToggleButton extends StatelessWidget {
   }
 }
 
-class _AdminSidebarEntry extends StatelessWidget {
+class _AdminSidebarEntry extends StatefulWidget {
   const _AdminSidebarEntry({
     required this.item,
     required this.currentPage,
     required this.collapsed,
     required this.onSelected,
+    required this.onOpenSidebar,
     required this.sidebarWidth,
   });
 
@@ -888,47 +899,102 @@ class _AdminSidebarEntry extends StatelessWidget {
   final String currentPage;
   final bool collapsed;
   final ValueChanged<String> onSelected;
+  final VoidCallback onOpenSidebar;
   final double sidebarWidth;
 
   @override
+  State<_AdminSidebarEntry> createState() => _AdminSidebarEntryState();
+}
+
+class _AdminSidebarEntryState extends State<_AdminSidebarEntry> {
+  late bool _expanded;
+
+  @override
+  void initState() {
+    super.initState();
+    _expanded = widget.item.containsPage(widget.currentPage);
+  }
+
+  @override
+  void didUpdateWidget(covariant _AdminSidebarEntry oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.collapsed) {
+      _expanded = false;
+      return;
+    }
+    if (widget.item.containsPage(widget.currentPage)) {
+      _expanded = true;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final item = widget.item;
     if (!item.hasChildren) {
       return _AdminSidebarItem(
         item: item,
-        selected: item.id == currentPage,
-        collapsed: collapsed,
-        onTap: () => onSelected(item.id),
-        sidebarWidth: sidebarWidth,
+        selected: item.id == widget.currentPage,
+        collapsed: widget.collapsed,
+        onTap: () => widget.onSelected(item.id),
+        sidebarWidth: widget.sidebarWidth,
       );
     }
 
-    final selected = item.containsPage(currentPage);
+    final selected = item.containsPage(widget.currentPage);
     final children = [
       _AdminSidebarItem(
         item: item,
         selected: selected,
-        collapsed: collapsed,
-        onTap: null,
-        sidebarWidth: sidebarWidth,
+        collapsed: widget.collapsed,
+        onTap: () {
+          if (widget.collapsed) {
+            widget.onOpenSidebar();
+            setState(() => _expanded = true);
+            widget.onSelected(item.children.first.id);
+            return;
+          }
+          setState(() => _expanded = !_expanded);
+        },
+        sidebarWidth: widget.sidebarWidth,
+        trailing: widget.collapsed
+            ? null
+            : Icon(
+                _expanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                color: selected ? Colors.white : Colors.white.withAlpha(190),
+                size: 20,
+              ),
       ),
-      if (!collapsed)
-        for (final child in item.children)
-          Padding(
-            padding: const EdgeInsets.only(top: 6, left: 18),
-            child: _AdminSidebarItem(
-              item: child,
-              selected: child.id == currentPage,
-              collapsed: false,
-              compact: true,
-              onTap: () => onSelected(child.id),
-              sidebarWidth: sidebarWidth,
-            ),
+      if (!widget.collapsed)
+        ClipRect(
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 180),
+            switchInCurve: Curves.easeOutCubic,
+            switchOutCurve: Curves.easeInCubic,
+            child: _expanded
+                ? Column(
+                    key: const ValueKey('expanded-logs'),
+                    children: [
+                      for (final child in item.children)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 6, left: 16),
+                          child: _AdminSidebarItem(
+                            item: child,
+                            selected: child.id == widget.currentPage,
+                            collapsed: false,
+                            onTap: () => widget.onSelected(child.id),
+                            sidebarWidth: widget.sidebarWidth,
+                          ),
+                        ),
+                    ],
+                  )
+                : const SizedBox.shrink(key: ValueKey('collapsed-logs')),
           ),
+        ),
     ];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: collapsed
+      children: widget.collapsed
           ? [
               Tooltip(
                 message: item.children.map((child) => child.label).join('\n'),
@@ -947,7 +1013,7 @@ class _AdminSidebarItem extends StatelessWidget {
     required this.collapsed,
     required this.onTap,
     required this.sidebarWidth,
-    this.compact = false,
+    this.trailing,
   });
 
   final _NavItem item;
@@ -955,7 +1021,7 @@ class _AdminSidebarItem extends StatelessWidget {
   final bool collapsed;
   final VoidCallback? onTap;
   final double sidebarWidth;
-  final bool compact;
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -971,7 +1037,7 @@ class _AdminSidebarItem extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         hoverColor: AppColors.adminSidebarActive.withAlpha(184),
         child: Container(
-          height: compact ? 44 : (collapsed ? 56 : 58),
+          height: collapsed ? 56 : 58,
           padding: EdgeInsets.symmetric(horizontal: collapsed ? 0 : 14),
           decoration: BoxDecoration(
             color: selected ? AppColors.adminSidebarActive : Colors.transparent,
@@ -984,7 +1050,7 @@ class _AdminSidebarItem extends StatelessWidget {
             children: [
               Container(
                 width: collapsed ? 46 : 44,
-                height: compact ? 34 : (collapsed ? 46 : 44),
+                height: collapsed ? 46 : 44,
                 decoration: BoxDecoration(
                   color: selected
                       ? AppColors.adminAccent
@@ -994,11 +1060,11 @@ class _AdminSidebarItem extends StatelessWidget {
                 child: Icon(
                   selected ? item.selectedIcon : item.icon,
                   color: iconColor,
-                  size: compact ? 18 : iconSize,
+                  size: iconSize,
                 ),
               ),
               if (!collapsed) ...[
-                SizedBox(width: compact ? 10 : 14),
+                const SizedBox(width: 14),
                 Expanded(
                   child: Text(
                     item.label,
@@ -1007,11 +1073,12 @@ class _AdminSidebarItem extends StatelessWidget {
                     softWrap: false,
                     style: TextStyle(
                       color: textColor,
-                      fontSize: compact ? 13.0 : fontSize,
+                      fontSize: fontSize,
                       fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                     ),
                   ),
                 ),
+                if (trailing != null) ...[const SizedBox(width: 8), trailing!],
               ],
             ],
           ),
