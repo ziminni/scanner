@@ -21,7 +21,6 @@ class StudentsPage extends StatefulWidget {
 class _StudentsPageState extends State<StudentsPage> {
   final _search = TextEditingController();
   String _sectionFilter = '';
-  String _statusFilter = '';
 
   @override
   void dispose() {
@@ -88,36 +87,37 @@ class _StudentsPageState extends State<StudentsPage> {
                 _sectionFilter = '';
               }
 
-              return Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  SizedBox(
-                    width: 360,
-                    child: TextField(
-                      controller: _search,
-                      decoration: const InputDecoration(
-                        prefixIcon: Icon(Icons.search),
-                        labelText: 'Search student name, LRN, section',
+              return LayoutBuilder(
+                builder: (context, constraints) {
+                  final searchWidth = (constraints.maxWidth - 192)
+                      .clamp(360.0, 720.0)
+                      .toDouble();
+                  return Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      SizedBox(
+                        width: searchWidth,
+                        child: TextField(
+                          controller: _search,
+                          decoration: const InputDecoration(
+                            prefixIcon: Icon(Icons.search),
+                            labelText: 'Search student name, LRN, section',
+                          ),
+                          onChanged: (_) => setState(() {}),
+                        ),
                       ),
-                      onChanged: (_) => setState(() {}),
-                    ),
-                  ),
-                  _FilterSelect(
-                    label: 'Section',
-                    value: _sectionFilter,
-                    options: sections,
-                    onChanged: (value) =>
-                        setState(() => _sectionFilter = value),
-                  ),
-                  _FilterSelect(
-                    label: 'Status',
-                    value: _statusFilter,
-                    options: const ['Active', 'Inactive'],
-                    onChanged: (value) => setState(() => _statusFilter = value),
-                  ),
-                ],
+                      _FilterSelect(
+                        label: 'Section',
+                        value: _sectionFilter,
+                        options: sections,
+                        onChanged: (value) =>
+                            setState(() => _sectionFilter = value),
+                      ),
+                    ],
+                  );
+                },
               );
             },
           ),
@@ -127,10 +127,7 @@ class _StudentsPageState extends State<StudentsPage> {
             columns: studentTableFields,
             schoolYearScoped: true,
             search: _search.text,
-            filters: {
-              if (_sectionFilter.isNotEmpty) 'section': _sectionFilter,
-              if (_statusFilter.isNotEmpty) 'status': _statusFilter,
-            },
+            filters: {if (_sectionFilter.isNotEmpty) 'section': _sectionFilter},
             onEdit: _openEditStudentDialog,
           ),
         ],

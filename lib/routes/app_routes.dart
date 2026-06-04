@@ -45,6 +45,7 @@ class AppRoutes {
   static const sections = 'sections';
   static const teachers = 'teachers';
   static const logs = 'logs';
+  static const gatePassLogs = 'gatePassLogs';
   static const attendanceStatus = 'attendanceStatus';
   static const earlyStudents = 'earlyStudents';
   static const reports = 'reports';
@@ -66,6 +67,7 @@ class AppRoutes {
   static const sectionsPath = '/sections';
   static const teachersPath = '/teachers';
   static const logsPath = '/attendance-logs';
+  static const gatePassLogsPath = '/gate-pass-logs';
   static const attendanceStatusPath = '/attendance-status';
   static const earlyStudentsPath = '/early-students';
   static const reportsPath = '/reports';
@@ -206,6 +208,12 @@ class AppRoutes {
           },
         ),
         _shellRoute(
+          path: gatePassLogsPath,
+          name: gatePassLogs,
+          pageId: gatePassLogs,
+          builder: (_) => const GatePassLogsPage(),
+        ),
+        _shellRoute(
           path: attendanceStatusPath,
           name: attendanceStatus,
           pageId: attendanceStatus,
@@ -293,6 +301,7 @@ class AppRoutes {
       sections => sectionsPath,
       teachers => teachersPath,
       logs => logsPath,
+      gatePassLogs => gatePassLogsPath,
       attendanceStatus => attendanceStatusPath,
       earlyStudents => earlyStudentsPath,
       reports => reportsPath,
@@ -317,6 +326,7 @@ class AppRoutes {
       sectionsPath => sections,
       teachersPath => teachers,
       logsPath => logs,
+      gatePassLogsPath => gatePassLogs,
       attendanceStatusPath => attendanceStatus,
       earlyStudentsPath => earlyStudents,
       reportsPath => reports,
@@ -334,6 +344,7 @@ class AppRoutes {
       sections,
       teachers,
       logs,
+      gatePassLogs,
       attendanceStatus,
       earlyStudents,
       reports,

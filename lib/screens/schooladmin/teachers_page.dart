@@ -36,7 +36,6 @@ class TeachersPage extends StatefulWidget {
 
 class _TeachersPageState extends State<TeachersPage> {
   final _search = TextEditingController();
-  String _statusFilter = '';
   String _scheduleFilter = '';
 
   @override
@@ -90,67 +89,53 @@ class _TeachersPageState extends State<TeachersPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              SizedBox(
-                width: 360,
-                child: TextField(
-                  controller: _search,
-                  decoration: const InputDecoration(
-                    prefixIcon: Icon(Icons.search),
-                    labelText: 'Search teacher name, ID, or contact',
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final searchWidth = (constraints.maxWidth - 192)
+                  .clamp(360.0, 720.0)
+                  .toDouble();
+              return Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  SizedBox(
+                    width: searchWidth,
+                    child: TextField(
+                      controller: _search,
+                      decoration: const InputDecoration(
+                        prefixIcon: Icon(Icons.search),
+                        labelText: 'Search teacher name, ID, or contact',
+                      ),
+                      onChanged: (_) => setState(() {}),
+                    ),
                   ),
-                  onChanged: (_) => setState(() {}),
-                ),
-              ),
-              SizedBox(
-                width: 180,
-                child: DropdownButtonFormField<String>(
-                  initialValue: _statusFilter,
-                  decoration: const InputDecoration(labelText: 'Status'),
-                  items: const [
-                    DropdownMenuItem(value: '', child: Text('All')),
-                    DropdownMenuItem(value: 'Active', child: Text('Active')),
-                    DropdownMenuItem(
-                      value: 'Inactive',
-                      child: Text('Inactive'),
+                  SizedBox(
+                    width: 180,
+                    child: DropdownButtonFormField<String>(
+                      initialValue: _scheduleFilter,
+                      decoration: const InputDecoration(labelText: 'Schedule'),
+                      items: const [
+                        DropdownMenuItem(value: '', child: Text('All')),
+                        DropdownMenuItem(
+                          value: '07:00 - 16:00',
+                          child: Text('07:00 - 16:00'),
+                        ),
+                        DropdownMenuItem(
+                          value: '07:30 - 16:30',
+                          child: Text('07:30 - 16:30'),
+                        ),
+                      ],
+                      onChanged: (value) =>
+                          setState(() => _scheduleFilter = value ?? ''),
                     ),
-                  ],
-                  onChanged: (value) =>
-                      setState(() => _statusFilter = value ?? ''),
-                ),
-              ),
-              SizedBox(
-                width: 180,
-                child: DropdownButtonFormField<String>(
-                  initialValue: _scheduleFilter,
-                  decoration: const InputDecoration(labelText: 'Schedule'),
-                  items: const [
-                    DropdownMenuItem(value: '', child: Text('All')),
-                    DropdownMenuItem(
-                      value: '07:00 - 16:00',
-                      child: Text('07:00 - 16:00'),
-                    ),
-                    DropdownMenuItem(
-                      value: '07:30 - 16:30',
-                      child: Text('07:30 - 16:30'),
-                    ),
-                  ],
-                  onChanged: (value) =>
-                      setState(() => _scheduleFilter = value ?? ''),
-                ),
-              ),
-            ],
+                  ),
+                ],
+              );
+            },
           ),
           const SizedBox(height: 12),
-          _TeachersTable(
-            search: _search.text,
-            statusFilter: _statusFilter,
-            scheduleFilter: _scheduleFilter,
-          ),
+          _TeachersTable(search: _search.text, scheduleFilter: _scheduleFilter),
         ],
       ),
     );

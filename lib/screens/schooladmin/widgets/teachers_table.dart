@@ -1,14 +1,9 @@
 part of '../teachers_page.dart';
 
 class _TeachersTable extends StatefulWidget {
-  const _TeachersTable({
-    required this.search,
-    required this.statusFilter,
-    required this.scheduleFilter,
-  });
+  const _TeachersTable({required this.search, required this.scheduleFilter});
 
   final String search;
-  final String statusFilter;
   final String scheduleFilter;
 
   @override
@@ -25,7 +20,6 @@ class _TeachersTableState extends State<_TeachersTable> {
   void didUpdateWidget(covariant _TeachersTable oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.search != widget.search ||
-        oldWidget.statusFilter != widget.statusFilter ||
         oldWidget.scheduleFilter != widget.scheduleFilter) {
       _currentPage = 0;
     }
@@ -51,11 +45,6 @@ class _TeachersTableState extends State<_TeachersTable> {
             final query = widget.search.trim().toLowerCase();
             final docs = (snapshot.data?.docs ?? []).where((doc) {
               final data = doc.data();
-              if (widget.statusFilter.isNotEmpty &&
-                  (data['status'] as String? ?? '').toLowerCase() !=
-                      widget.statusFilter.toLowerCase()) {
-                return false;
-              }
               if (widget.scheduleFilter.isNotEmpty &&
                   _teacherSchedule(data) != widget.scheduleFilter) {
                 return false;

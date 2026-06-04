@@ -170,76 +170,63 @@ class _CollectionTableBodyState extends State<_CollectionTableBody> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  return SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        minWidth: constraints.maxWidth,
+              FullWidthHorizontalTable(
+                child: DataTable(
+                  headingRowHeight: 48,
+                  dataRowMinHeight: hasCountsColumn ? 96 : 44,
+                  dataRowMaxHeight: hasCountsColumn ? 132 : 44,
+                  columns: [
+                    for (final column in widget.columns)
+                      DataColumn(
+                        label: Text(
+                          column == 'fullName'
+                              ? 'Full Name'
+                              : adminLabel(column),
+                        ),
                       ),
-                      child: DataTable(
-                        headingRowHeight: 48,
-                        dataRowMinHeight: hasCountsColumn ? 96 : 44,
-                        dataRowMaxHeight: hasCountsColumn ? 132 : 44,
-                        columns: [
+                    const DataColumn(label: Text('Actions')),
+                  ],
+                  rows: [
+                    for (final doc in paginatedDocs)
+                      DataRow(
+                        cells: [
                           for (final column in widget.columns)
-                            DataColumn(
-                              label: Text(
+                            DataCell(
+                              _buildCell(
+                                context,
                                 column == 'fullName'
-                                    ? 'Full Name'
-                                    : adminLabel(column),
+                                    ? adminPersonName(doc.data())
+                                    : doc.data()[column],
+                                column,
                               ),
                             ),
-                          const DataColumn(label: Text('Actions')),
-                        ],
-                        rows: [
-                          for (final doc in paginatedDocs)
-                            DataRow(
-                              cells: [
-                                for (final column in widget.columns)
-                                  DataCell(
-                                    _buildCell(
+                          DataCell(
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  tooltip: 'Archive',
+                                  icon: const Icon(Icons.archive_outlined),
+                                  onPressed: () => widget.onArchive(doc.id),
+                                ),
+                                if (widget.onEdit != null)
+                                  IconButton(
+                                    tooltip: 'Edit',
+                                    icon: const Icon(Icons.edit_outlined),
+                                    onPressed: () => widget.onEdit!(
                                       context,
-                                      column == 'fullName'
-                                          ? adminPersonName(doc.data())
-                                          : doc.data()[column],
-                                      column,
+                                      doc.id,
+                                      doc.data(),
+                                      widget.schoolYearId,
                                     ),
                                   ),
-                                DataCell(
-                                  Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      IconButton(
-                                        tooltip: 'Archive',
-                                        icon: const Icon(
-                                          Icons.archive_outlined,
-                                        ),
-                                        onPressed: () =>
-                                            widget.onArchive(doc.id),
-                                      ),
-                                      if (widget.onEdit != null)
-                                        IconButton(
-                                          tooltip: 'Edit',
-                                          icon: const Icon(Icons.edit_outlined),
-                                          onPressed: () => widget.onEdit!(
-                                            context,
-                                            doc.id,
-                                            doc.data(),
-                                            widget.schoolYearId,
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                ),
                               ],
                             ),
+                          ),
                         ],
                       ),
-                    ),
-                  );
-                },
+                  ],
+                ),
               ),
               const SizedBox(height: 12),
               AdminTableFooter(
@@ -524,20 +511,39 @@ class AdminPaginationControls extends StatelessWidget {
   }
 }
 
-class FullWidthHorizontalTable extends StatelessWidget {
+class FullWidthHorizontalTable extends StatefulWidget {
   const FullWidthHorizontalTable({super.key, required this.child});
 
   final Widget child;
 
   @override
+  State<FullWidthHorizontalTable> createState() =>
+      _FullWidthHorizontalTableState();
+}
+
+class _FullWidthHorizontalTableState extends State<FullWidthHorizontalTable> {
+  final _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        return SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minWidth: constraints.maxWidth),
-            child: child,
+        return Scrollbar(
+          controller: _scrollController,
+          thumbVisibility: true,
+          child: SingleChildScrollView(
+            controller: _scrollController,
+            scrollDirection: Axis.horizontal,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minWidth: constraints.maxWidth),
+              child: widget.child,
+            ),
           ),
         );
       },

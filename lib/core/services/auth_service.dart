@@ -394,6 +394,7 @@ class AuthService {
     'sections',
     'teachers',
     'logs',
+    'gatePassLogs',
     'attendanceStatus',
     'earlyStudents',
     'reports',

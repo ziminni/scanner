@@ -23,10 +23,11 @@ class AppShell extends StatelessWidget {
     final app = AppScope.of(context);
     final user = app.currentUser!;
     final items = _itemsFor(user.role);
-    final currentIndex = items
+    final navigableItems = _navigableItems(items);
+    final currentIndex = navigableItems
         .indexWhere((item) => item.id == currentPage)
-        .clamp(0, items.length - 1);
-    final bottomItems = items.take(5).toList();
+        .clamp(0, navigableItems.length - 1);
+    final bottomItems = navigableItems.take(5).toList();
     final bottomIndex = bottomItems
         .indexWhere((item) => item.id == currentPage)
         .clamp(0, bottomItems.length - 1);
@@ -34,7 +35,7 @@ class AppShell extends StatelessWidget {
     if (user.role == UserRole.staffScanner) {
       return _ScannerShell(
         user: user,
-        items: items,
+        items: navigableItems,
         currentIndex: currentIndex,
         bottomItems: bottomItems,
         bottomIndex: bottomIndex,
@@ -79,7 +80,7 @@ class AppShell extends StatelessWidget {
     return _AdminDesktopShell(
       user: user,
       items: items,
-      currentIndex: currentIndex,
+      currentPage: currentPage,
       onLogout: app.logout,
       child: child,
     );
@@ -169,10 +170,26 @@ class AppShell extends StatelessWidget {
         ),
         _NavItem(
           AppRoutes.logs,
-          'Attendance Logs',
+          'Logs',
           'Logs',
           Icons.list_alt_outlined,
           Icons.list_alt,
+          children: [
+            _NavItem(
+              AppRoutes.logs,
+              'Attendance Logs',
+              'Attendance',
+              Icons.fact_check_outlined,
+              Icons.fact_check,
+            ),
+            _NavItem(
+              AppRoutes.gatePassLogs,
+              'Gate Pass Logs',
+              'Gate Pass',
+              Icons.exit_to_app_outlined,
+              Icons.exit_to_app,
+            ),
+          ],
         ),
         _NavItem(
           AppRoutes.attendanceStatus,
@@ -221,20 +238,27 @@ class AppShell extends StatelessWidget {
       ],
     };
   }
+
+  List<_NavItem> _navigableItems(List<_NavItem> items) {
+    return [
+      for (final item in items)
+        if (item.hasChildren) ...item.children else item,
+    ];
+  }
 }
 
 class _AdminDesktopShell extends StatefulWidget {
   const _AdminDesktopShell({
     required this.user,
     required this.items,
-    required this.currentIndex,
+    required this.currentPage,
     required this.onLogout,
     required this.child,
   });
 
   final AppUser user;
   final List<_NavItem> items;
-  final int currentIndex;
+  final String currentPage;
   final VoidCallback onLogout;
   final Widget child;
 
@@ -276,11 +300,10 @@ class _AdminDesktopShellState extends State<_AdminDesktopShell> {
         children: [
           _AdminSidebar(
             items: widget.items,
-            currentIndex: widget.currentIndex,
+            currentPage: widget.currentPage,
             collapsed: _sidebarCollapsed,
             contentCollapsed: _sidebarContentCollapsed,
-            onSelected: (index) =>
-                context.go(AppRoutes.pathForPage(widget.items[index].id)),
+            onSelected: (pageId) => context.go(AppRoutes.pathForPage(pageId)),
           ),
           Expanded(
             child: Column(
@@ -693,17 +716,17 @@ String _cleanError(String message) {
 class _AdminSidebar extends StatelessWidget {
   const _AdminSidebar({
     required this.items,
-    required this.currentIndex,
+    required this.currentPage,
     required this.collapsed,
     required this.contentCollapsed,
     required this.onSelected,
   });
 
   final List<_NavItem> items;
-  final int currentIndex;
+  final String currentPage;
   final bool collapsed;
   final bool contentCollapsed;
-  final ValueChanged<int> onSelected;
+  final ValueChanged<String> onSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -786,12 +809,11 @@ class _AdminSidebar extends StatelessWidget {
               separatorBuilder: (_, _) => const SizedBox(height: 8),
               itemBuilder: (context, index) {
                 final item = items[index];
-                final selected = index == currentIndex;
-                return _AdminSidebarItem(
+                return _AdminSidebarEntry(
                   item: item,
-                  selected: selected,
+                  currentPage: currentPage,
                   collapsed: contentCollapsed,
-                  onTap: () => onSelected(index),
+                  onSelected: onSelected,
                   sidebarWidth: sidebarWidth,
                 );
               },
@@ -853,6 +875,71 @@ class _HeaderSidebarToggleButton extends StatelessWidget {
   }
 }
 
+class _AdminSidebarEntry extends StatelessWidget {
+  const _AdminSidebarEntry({
+    required this.item,
+    required this.currentPage,
+    required this.collapsed,
+    required this.onSelected,
+    required this.sidebarWidth,
+  });
+
+  final _NavItem item;
+  final String currentPage;
+  final bool collapsed;
+  final ValueChanged<String> onSelected;
+  final double sidebarWidth;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!item.hasChildren) {
+      return _AdminSidebarItem(
+        item: item,
+        selected: item.id == currentPage,
+        collapsed: collapsed,
+        onTap: () => onSelected(item.id),
+        sidebarWidth: sidebarWidth,
+      );
+    }
+
+    final selected = item.containsPage(currentPage);
+    final children = [
+      _AdminSidebarItem(
+        item: item,
+        selected: selected,
+        collapsed: collapsed,
+        onTap: null,
+        sidebarWidth: sidebarWidth,
+      ),
+      if (!collapsed)
+        for (final child in item.children)
+          Padding(
+            padding: const EdgeInsets.only(top: 6, left: 18),
+            child: _AdminSidebarItem(
+              item: child,
+              selected: child.id == currentPage,
+              collapsed: false,
+              compact: true,
+              onTap: () => onSelected(child.id),
+              sidebarWidth: sidebarWidth,
+            ),
+          ),
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: collapsed
+          ? [
+              Tooltip(
+                message: item.children.map((child) => child.label).join('\n'),
+                child: children.first,
+              ),
+            ]
+          : children,
+    );
+  }
+}
+
 class _AdminSidebarItem extends StatelessWidget {
   const _AdminSidebarItem({
     required this.item,
@@ -860,13 +947,15 @@ class _AdminSidebarItem extends StatelessWidget {
     required this.collapsed,
     required this.onTap,
     required this.sidebarWidth,
+    this.compact = false,
   });
 
   final _NavItem item;
   final bool selected;
   final bool collapsed;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final double sidebarWidth;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -882,7 +971,7 @@ class _AdminSidebarItem extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         hoverColor: AppColors.adminSidebarActive.withAlpha(184),
         child: Container(
-          height: collapsed ? 56 : 58,
+          height: compact ? 44 : (collapsed ? 56 : 58),
           padding: EdgeInsets.symmetric(horizontal: collapsed ? 0 : 14),
           decoration: BoxDecoration(
             color: selected ? AppColors.adminSidebarActive : Colors.transparent,
@@ -895,7 +984,7 @@ class _AdminSidebarItem extends StatelessWidget {
             children: [
               Container(
                 width: collapsed ? 46 : 44,
-                height: collapsed ? 46 : 44,
+                height: compact ? 34 : (collapsed ? 46 : 44),
                 decoration: BoxDecoration(
                   color: selected
                       ? AppColors.adminAccent
@@ -905,11 +994,11 @@ class _AdminSidebarItem extends StatelessWidget {
                 child: Icon(
                   selected ? item.selectedIcon : item.icon,
                   color: iconColor,
-                  size: iconSize,
+                  size: compact ? 18 : iconSize,
                 ),
               ),
               if (!collapsed) ...[
-                const SizedBox(width: 14),
+                SizedBox(width: compact ? 10 : 14),
                 Expanded(
                   child: Text(
                     item.label,
@@ -918,7 +1007,7 @@ class _AdminSidebarItem extends StatelessWidget {
                     softWrap: false,
                     style: TextStyle(
                       color: textColor,
-                      fontSize: fontSize,
+                      fontSize: compact ? 13.0 : fontSize,
                       fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                     ),
                   ),
@@ -1297,14 +1386,21 @@ class _NavItem {
     this.label,
     this.shortLabel,
     this.icon,
-    this.selectedIcon,
-  );
+    this.selectedIcon, {
+    this.children = const [],
+  });
 
   final String id;
   final String label;
   final String shortLabel;
   final IconData icon;
   final IconData selectedIcon;
+  final List<_NavItem> children;
+
+  bool get hasChildren => children.isNotEmpty;
+
+  bool containsPage(String pageId) =>
+      id == pageId || children.any((child) => child.containsPage(pageId));
 }
 
 class ActiveSchoolYearGate extends StatelessWidget {

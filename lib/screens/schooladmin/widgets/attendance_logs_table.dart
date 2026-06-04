@@ -199,8 +199,7 @@ class GatePassLogsTable extends StatelessWidget {
           return const EmptyState(title: 'No gate pass logs found');
         }
         return DataSurface(
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
+          child: FullWidthHorizontalTable(
             child: DataTable(
               columns: const [
                 DataColumn(label: Text('ID')),
