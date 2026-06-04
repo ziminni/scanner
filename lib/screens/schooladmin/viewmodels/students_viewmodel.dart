@@ -99,9 +99,7 @@ const studentFields = [
 
 const studentTableFields = [
   'lrn',
-  'lastName',
-  'firstName',
-  'middleName',
+  'fullName',
   'birthdate',
   'address',
   'guardianName',

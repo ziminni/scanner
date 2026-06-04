@@ -89,12 +89,11 @@ class _AttendanceStatusPageState extends State<AttendanceStatusPage> {
                 ],
               ),
               const SizedBox(height: 12),
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  SegmentedButton<AttendanceStatusFilter>(
+              SizedBox(
+                width: double.infinity,
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: SegmentedButton<AttendanceStatusFilter>(
                     segments: [
                       for (final filter in AttendanceStatusFilter.values)
                         ButtonSegment(value: filter, label: Text(filter.label)),
@@ -103,6 +102,14 @@ class _AttendanceStatusPageState extends State<AttendanceStatusPage> {
                     onSelectionChanged: (selection) =>
                         _viewModel.setFilter(selection.first),
                   ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
                   SizedBox(
                     width: 320,
                     child: TextField(
@@ -112,6 +119,18 @@ class _AttendanceStatusPageState extends State<AttendanceStatusPage> {
                       ),
                       onChanged: _viewModel.setSearch,
                     ),
+                  ),
+                  _StatusFilterSelect(
+                    label: 'Role',
+                    value: _viewModel.roleFilter,
+                    options: const ['Student', 'Teacher'],
+                    onChanged: _viewModel.setRoleFilter,
+                  ),
+                  _StatusFilterSelect(
+                    label: 'Section',
+                    value: _viewModel.sectionFilter,
+                    options: _viewModel.sections,
+                    onChanged: _viewModel.setSectionFilter,
                   ),
                 ],
               ),
@@ -128,6 +147,38 @@ class _AttendanceStatusPageState extends State<AttendanceStatusPage> {
           ),
         );
       },
+    );
+  }
+}
+
+class _StatusFilterSelect extends StatelessWidget {
+  const _StatusFilterSelect({
+    required this.label,
+    required this.value,
+    required this.options,
+    required this.onChanged,
+  });
+
+  final String label;
+  final String value;
+  final List<String> options;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final displayValue = value.isEmpty || options.contains(value) ? value : '';
+    return SizedBox(
+      width: 170,
+      child: DropdownButtonFormField<String>(
+        initialValue: displayValue,
+        decoration: InputDecoration(labelText: label),
+        items: [
+          const DropdownMenuItem(value: '', child: Text('All')),
+          for (final option in options)
+            DropdownMenuItem(value: option, child: Text(option)),
+        ],
+        onChanged: (next) => onChanged(next ?? ''),
+      ),
     );
   }
 }

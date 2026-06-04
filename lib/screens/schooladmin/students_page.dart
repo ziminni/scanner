@@ -20,6 +20,8 @@ class StudentsPage extends StatefulWidget {
 
 class _StudentsPageState extends State<StudentsPage> {
   final _search = TextEditingController();
+  String _sectionFilter = '';
+  String _statusFilter = '';
 
   @override
   void dispose() {
@@ -32,6 +34,25 @@ class _StudentsPageState extends State<StudentsPage> {
     return AdminPage(
       title: 'Students',
       actions: [
+        OutlinedButton.icon(
+          icon: const Icon(Icons.archive_outlined),
+          label: const Text('Archives'),
+          onPressed: () => showDialog<void>(
+            context: context,
+            builder: (_) => const ArchivedRecordsDialog(
+              title: 'Archived Students',
+              collection: 'students',
+              schoolYearScoped: true,
+              columns: [
+                'lrn',
+                'fullName',
+                'birthdate',
+                'section',
+                'archivedAt',
+              ],
+            ),
+          ),
+        ),
         OutlinedButton.icon(
           icon: const Icon(Icons.upload_file_outlined),
           label: const Text('Import students'),
@@ -52,16 +73,53 @@ class _StudentsPageState extends State<StudentsPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 380,
-            child: TextField(
-              controller: _search,
-              decoration: const InputDecoration(
-                prefixIcon: Icon(Icons.search),
-                labelText: 'Search student name, LRN, section',
-              ),
-              onChanged: (_) => setState(() {}),
-            ),
+          StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            stream: AppScope.of(context).repository.activeSectionsStream(),
+            builder: (context, snapshot) {
+              final sections =
+                  (snapshot.data?.docs ?? [])
+                      .map((doc) => doc.data()['name'] as String? ?? '')
+                      .where((name) => name.trim().isNotEmpty)
+                      .toSet()
+                      .toList()
+                    ..sort();
+              if (_sectionFilter.isNotEmpty &&
+                  !sections.contains(_sectionFilter)) {
+                _sectionFilter = '';
+              }
+
+              return Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  SizedBox(
+                    width: 360,
+                    child: TextField(
+                      controller: _search,
+                      decoration: const InputDecoration(
+                        prefixIcon: Icon(Icons.search),
+                        labelText: 'Search student name, LRN, section',
+                      ),
+                      onChanged: (_) => setState(() {}),
+                    ),
+                  ),
+                  _FilterSelect(
+                    label: 'Section',
+                    value: _sectionFilter,
+                    options: sections,
+                    onChanged: (value) =>
+                        setState(() => _sectionFilter = value),
+                  ),
+                  _FilterSelect(
+                    label: 'Status',
+                    value: _statusFilter,
+                    options: const ['Active', 'Inactive'],
+                    onChanged: (value) => setState(() => _statusFilter = value),
+                  ),
+                ],
+              );
+            },
           ),
           const SizedBox(height: 12),
           CollectionTable(
@@ -69,9 +127,45 @@ class _StudentsPageState extends State<StudentsPage> {
             columns: studentTableFields,
             schoolYearScoped: true,
             search: _search.text,
+            filters: {
+              if (_sectionFilter.isNotEmpty) 'section': _sectionFilter,
+              if (_statusFilter.isNotEmpty) 'status': _statusFilter,
+            },
             onEdit: _openEditStudentDialog,
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _FilterSelect extends StatelessWidget {
+  const _FilterSelect({
+    required this.label,
+    required this.value,
+    required this.options,
+    required this.onChanged,
+  });
+
+  final String label;
+  final String value;
+  final List<String> options;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final displayValue = value.isEmpty || options.contains(value) ? value : '';
+    return SizedBox(
+      width: 180,
+      child: DropdownButtonFormField<String>(
+        initialValue: displayValue,
+        decoration: InputDecoration(labelText: label),
+        items: [
+          const DropdownMenuItem(value: '', child: Text('All')),
+          for (final option in options)
+            DropdownMenuItem(value: option, child: Text(option)),
+        ],
+        onChanged: (next) => onChanged(next ?? ''),
       ),
     );
   }

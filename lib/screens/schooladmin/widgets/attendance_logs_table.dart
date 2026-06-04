@@ -1,10 +1,22 @@
 part of '../attendance_logs_page.dart';
 
 class AttendanceLogsTable extends StatefulWidget {
-  const AttendanceLogsTable({super.key, required this.limit, this.search = ''});
+  const AttendanceLogsTable({
+    super.key,
+    required this.limit,
+    this.search = '',
+    this.roleFilter = '',
+    this.typeFilter = '',
+    this.statusFilter = '',
+    this.syncFilter = '',
+  });
 
   final int limit;
   final String search;
+  final String roleFilter;
+  final String typeFilter;
+  final String statusFilter;
+  final String syncFilter;
 
   @override
   State<AttendanceLogsTable> createState() => _AttendanceLogsTableState();
@@ -19,7 +31,12 @@ class _AttendanceLogsTableState extends State<AttendanceLogsTable> {
   @override
   void didUpdateWidget(covariant AttendanceLogsTable oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.search != widget.search || oldWidget.limit != widget.limit) {
+    if (oldWidget.search != widget.search ||
+        oldWidget.limit != widget.limit ||
+        oldWidget.roleFilter != widget.roleFilter ||
+        oldWidget.typeFilter != widget.typeFilter ||
+        oldWidget.statusFilter != widget.statusFilter ||
+        oldWidget.syncFilter != widget.syncFilter) {
       _currentPage = 0;
     }
   }
@@ -31,16 +48,30 @@ class _AttendanceLogsTableState extends State<AttendanceLogsTable> {
       stream: app.attendance.logsStream(limit: widget.limit),
       builder: (context, snapshot) {
         final query = widget.search.toLowerCase();
-        final logs = (snapshot.data?.docs ?? [])
-            .map(AttendanceLog.fromDoc)
-            .where(
-              (log) =>
-                  query.isEmpty ||
-                  '${log.personId} ${log.fullName} ${log.section} ${log.scannedBy}'
-                      .toLowerCase()
-                      .contains(query),
-            )
-            .toList();
+        final logs = (snapshot.data?.docs ?? []).map(AttendanceLog.fromDoc).where((
+          log,
+        ) {
+          if (widget.roleFilter.isNotEmpty &&
+              log.personRole.label != widget.roleFilter) {
+            return false;
+          }
+          if (widget.typeFilter.isNotEmpty &&
+              log.attendanceType.label != widget.typeFilter) {
+            return false;
+          }
+          if (widget.statusFilter.isNotEmpty &&
+              log.attendanceStatus.label != widget.statusFilter) {
+            return false;
+          }
+          if (widget.syncFilter.isNotEmpty &&
+              log.syncStatus.label != widget.syncFilter) {
+            return false;
+          }
+          return query.isEmpty ||
+              '${log.personId} ${log.fullName} ${log.section} ${log.scannedBy}'
+                  .toLowerCase()
+                  .contains(query);
+        }).toList();
         if (logs.isEmpty) {
           return const EmptyState(title: 'No attendance logs found');
         }
@@ -82,8 +113,8 @@ class _AttendanceLogsTableState extends State<AttendanceLogsTable> {
                           DataCell(
                             StatusBadge(
                               label: log.attendanceStatus.label,
-                              type: log.attendanceStatus ==
-                                      AttendanceStatus.late
+                              type:
+                                  log.attendanceStatus == AttendanceStatus.late
                                   ? 'late'
                                   : 'active',
                             ),
@@ -130,10 +161,18 @@ class _AttendanceLogsTableState extends State<AttendanceLogsTable> {
 }
 
 class GatePassLogsTable extends StatelessWidget {
-  const GatePassLogsTable({super.key, required this.limit, this.search = ''});
+  const GatePassLogsTable({
+    super.key,
+    required this.limit,
+    this.search = '',
+    this.roleFilter = '',
+    this.syncFilter = '',
+  });
 
   final int limit;
   final String search;
+  final String roleFilter;
+  final String syncFilter;
 
   @override
   Widget build(BuildContext context) {
@@ -142,16 +181,20 @@ class GatePassLogsTable extends StatelessWidget {
       stream: app.attendance.gatePassLogsStream(limit: limit),
       builder: (context, snapshot) {
         final query = search.toLowerCase();
-        final logs = (snapshot.data?.docs ?? [])
-            .map(GatePassLog.fromDoc)
-            .where(
-              (log) =>
-                  query.isEmpty ||
-                  '${log.personId} ${log.fullName} ${log.section} ${log.scannedBy} ${log.reason}'
-                      .toLowerCase()
-                      .contains(query),
-            )
-            .toList();
+        final logs = (snapshot.data?.docs ?? []).map(GatePassLog.fromDoc).where((
+          log,
+        ) {
+          if (roleFilter.isNotEmpty && log.personRole.label != roleFilter) {
+            return false;
+          }
+          if (syncFilter.isNotEmpty && log.syncStatus.label != syncFilter) {
+            return false;
+          }
+          return query.isEmpty ||
+              '${log.personId} ${log.fullName} ${log.section} ${log.scannedBy} ${log.reason}'
+                  .toLowerCase()
+                  .contains(query);
+        }).toList();
         if (logs.isEmpty) {
           return const EmptyState(title: 'No gate pass logs found');
         }

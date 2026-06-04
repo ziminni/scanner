@@ -78,6 +78,42 @@ class _EarlyStudentsPageState extends State<EarlyStudentsPage> {
             children: [
               _LeaderboardSummary(viewModel: _viewModel),
               const SizedBox(height: 12),
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.public_outlined),
+                    label: const Text('Overall'),
+                    onPressed:
+                        _viewModel.sectionFilter.isEmpty &&
+                            _viewModel.genderFilter.isEmpty &&
+                            _viewModel.gradeLevelFilter.isEmpty
+                        ? null
+                        : _viewModel.clearFilters,
+                  ),
+                  _EarlyFilterSelect(
+                    label: 'Section',
+                    value: _viewModel.sectionFilter,
+                    options: _viewModel.sections,
+                    onChanged: _viewModel.setSectionFilter,
+                  ),
+                  _EarlyFilterSelect(
+                    label: 'Gender',
+                    value: _viewModel.genderFilter,
+                    options: _viewModel.genders,
+                    onChanged: _viewModel.setGenderFilter,
+                  ),
+                  _EarlyFilterSelect(
+                    label: 'Grade Level',
+                    value: _viewModel.gradeLevelFilter,
+                    options: _viewModel.gradeLevels,
+                    onChanged: _viewModel.setGradeLevelFilter,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
               if (_viewModel.busy)
                 const LoadingWidget()
               else if (_viewModel.error != null)
@@ -94,6 +130,38 @@ class _EarlyStudentsPageState extends State<EarlyStudentsPage> {
           ),
         );
       },
+    );
+  }
+}
+
+class _EarlyFilterSelect extends StatelessWidget {
+  const _EarlyFilterSelect({
+    required this.label,
+    required this.value,
+    required this.options,
+    required this.onChanged,
+  });
+
+  final String label;
+  final String value;
+  final List<String> options;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final displayValue = value.isEmpty || options.contains(value) ? value : '';
+    return SizedBox(
+      width: 180,
+      child: DropdownButtonFormField<String>(
+        initialValue: displayValue,
+        decoration: InputDecoration(labelText: label),
+        items: [
+          const DropdownMenuItem(value: '', child: Text('All')),
+          for (final option in options)
+            DropdownMenuItem(value: option, child: Text(option)),
+        ],
+        onChanged: (next) => onChanged(next ?? ''),
+      ),
     );
   }
 }

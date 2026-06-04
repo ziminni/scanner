@@ -1,7 +1,11 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-
 import '../../core/services/app_controller.dart';
+import '../../core/utils/download_file.dart';
+import '../../core/utils/section_qr_worker_client.dart';
+import '../../models/models.dart';
 import '../../shared/widgets/admin_widgets.dart';
 import '../../shared/widgets/app_widgets.dart';
 import 'viewmodels/crud_viewmodel.dart';
@@ -11,6 +15,7 @@ part 'widgets/edit_section_dialog.dart';
 part 'widgets/sections_by_grade.dart';
 part 'widgets/section_card.dart';
 part 'widgets/section_details_dialog.dart';
+part 'widgets/section_qr_exporter.dart';
 part 'widgets/detail_metric.dart';
 part 'widgets/card_line.dart';
 part 'widgets/adviser_dropdown.dart';
@@ -38,6 +43,18 @@ class _SectionsPageState extends State<SectionsPage> {
     return AdminPage(
       title: 'Sections',
       actions: [
+        OutlinedButton.icon(
+          icon: const Icon(Icons.archive_outlined),
+          label: const Text('Archives'),
+          onPressed: () => showDialog<void>(
+            context: context,
+            builder: (_) => const ArchivedRecordsDialog(
+              title: 'Archived Sections',
+              collection: 'sections',
+              columns: ['name', 'gradeLevel', 'adviser', 'archivedAt'],
+            ),
+          ),
+        ),
         FilledButton.icon(
           icon: const Icon(Icons.add),
           label: const Text('Add section'),

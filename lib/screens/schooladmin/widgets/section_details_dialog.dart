@@ -23,7 +23,6 @@ class _SectionDetailsDialogState extends State<_SectionDetailsDialog> {
     final app = AppScope.of(context);
     final sectionName = widget.section['name'] as String? ?? '';
     final gradeLevel = widget.section['gradeLevel'] as String? ?? '';
-    final adviser = widget.section['adviser'] as String? ?? '';
 
     return AlertDialog(
       title: Text(sectionName.isEmpty ? 'Section Details' : sectionName),
@@ -48,10 +47,7 @@ class _SectionDetailsDialogState extends State<_SectionDetailsDialog> {
                       label: 'Grade Level',
                       value: gradeLevel.isEmpty ? '-' : gradeLevel,
                     ),
-                    _DetailMetric(
-                      label: 'Adviser',
-                      value: adviser.isEmpty ? 'No adviser' : adviser,
-                    ),
+                    _SectionDetailsAdviserMetric(section: widget.section),
                   ],
                 ),
               ),
@@ -149,4 +145,52 @@ class _SectionDetailsDialogState extends State<_SectionDetailsDialog> {
   }
 
   String _text(Object? value) => (value as String? ?? '').trim();
+}
+
+class _SectionDetailsAdviserMetric extends StatelessWidget {
+  const _SectionDetailsAdviserMetric({required this.section});
+
+  final Map<String, dynamic> section;
+
+  @override
+  Widget build(BuildContext context) {
+    final app = AppScope.of(context);
+    final adviserDocId = (section['adviserDocId'] as String? ?? '').trim();
+    if (adviserDocId.isEmpty) {
+      return const _DetailMetric(label: 'Adviser', value: 'No adviser');
+    }
+
+    return FutureBuilder(
+      future: app.attendance.activeSchoolYear(),
+      builder: (context, schoolYearSnapshot) {
+        final schoolYear = schoolYearSnapshot.data;
+        if (schoolYear == null) {
+          return const _DetailMetric(label: 'Adviser', value: 'No adviser');
+        }
+
+        return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+          stream: app.repository
+              .schoolYearCollection(schoolYear.id, 'teachers')
+              .doc(adviserDocId)
+              .snapshots(),
+          builder: (context, snapshot) {
+            final data = snapshot.data?.data();
+            if (data == null || data['archived'] == true) {
+              return const _DetailMetric(label: 'Adviser', value: 'No adviser');
+            }
+            final name = [
+              data['lastName'] as String? ?? '',
+              data['firstName'] as String? ?? '',
+              data['middleName'] as String? ?? '',
+            ].where((part) => part.trim().isNotEmpty).join(', ');
+            final adviserText = _SectionCard.formatAdviserName(name);
+            return _DetailMetric(
+              label: 'Adviser',
+              value: adviserText.isEmpty ? 'No adviser' : adviserText,
+            );
+          },
+        );
+      },
+    );
+  }
 }

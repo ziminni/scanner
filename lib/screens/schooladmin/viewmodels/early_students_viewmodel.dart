@@ -28,6 +28,8 @@ class EarlyLeaderboardEntry {
     required this.averageTimeInMinutes,
     required this.validDays,
     this.timeInText = '',
+    this.gender = '',
+    this.gradeLevel = '',
   });
 
   final int rank;
@@ -39,6 +41,8 @@ class EarlyLeaderboardEntry {
   final double averageTimeInMinutes;
   final int validDays;
   final String timeInText;
+  final String gender;
+  final String gradeLevel;
 
   String get averageTimeInText {
     if (averageTimeInMinutes.isInfinite) return '-';
@@ -60,7 +64,34 @@ class EarlyStudentsViewModel extends BaseViewModel {
   PersonRole selectedRole = PersonRole.student;
   SchoolYear? activeSchoolYear;
   String periodLabel = '';
-  List<EarlyLeaderboardEntry> entries = [];
+  List<EarlyLeaderboardEntry> _entries = [];
+  String sectionFilter = '';
+  String genderFilter = '';
+  String gradeLevelFilter = '';
+
+  List<EarlyLeaderboardEntry> get entries {
+    return _entries.where((entry) {
+      if (sectionFilter.isNotEmpty && entry.section != sectionFilter) {
+        return false;
+      }
+      if (genderFilter.isNotEmpty && entry.gender != genderFilter) {
+        return false;
+      }
+      if (gradeLevelFilter.isNotEmpty && entry.gradeLevel != gradeLevelFilter) {
+        return false;
+      }
+      return true;
+    }).toList();
+  }
+
+  List<String> get sections =>
+      _filterOptions(_entries.map((entry) => entry.section));
+
+  List<String> get genders =>
+      _filterOptions(_entries.map((entry) => entry.gender));
+
+  List<String> get gradeLevels =>
+      _filterOptions(_entries.map((entry) => entry.gradeLevel));
 
   Future<void> load() async {
     setBusy(true);
@@ -68,7 +99,7 @@ class EarlyStudentsViewModel extends BaseViewModel {
     try {
       activeSchoolYear = await _app.attendance.activeSchoolYear();
       if (activeSchoolYear == null) {
-        entries = [];
+        _entries = [];
         periodLabel = '';
         setError('Create an active school year before viewing leaderboards.');
         return;
@@ -76,18 +107,20 @@ class EarlyStudentsViewModel extends BaseViewModel {
 
       final range = _rangeFor(period, selectedDate, activeSchoolYear!);
       periodLabel = range.label;
+      final metadata = await _loadPersonFilterData(activeSchoolYear!.id);
       final logs = await _loadLogs(
         range.start,
         range.end,
         activeSchoolYear!.id,
       );
       final dailyRankings = _dailyRankings(logs);
-      entries = period == EarlyLeaderboardPeriod.daily
+      _entries = period == EarlyLeaderboardPeriod.daily
           ? _dailyEntries(
               dailyRankings[DateFormat('yyyy-MM-dd').format(selectedDate)] ??
                   [],
+              metadata,
             )
-          : _aggregateEntries(dailyRankings);
+          : _aggregateEntries(dailyRankings, metadata);
       notifyListeners();
     } catch (error) {
       setError(error.toString());
@@ -110,8 +143,31 @@ class EarlyStudentsViewModel extends BaseViewModel {
 
   Future<void> setRole(PersonRole role) async {
     selectedRole = role;
+    clearFilters();
     notifyListeners();
     await load();
+  }
+
+  void setSectionFilter(String value) {
+    sectionFilter = value;
+    notifyListeners();
+  }
+
+  void setGenderFilter(String value) {
+    genderFilter = value;
+    notifyListeners();
+  }
+
+  void setGradeLevelFilter(String value) {
+    gradeLevelFilter = value;
+    notifyListeners();
+  }
+
+  void clearFilters() {
+    sectionFilter = '';
+    genderFilter = '';
+    gradeLevelFilter = '';
+    notifyListeners();
   }
 
   Future<List<AttendanceLog>> _loadLogs(
@@ -168,7 +224,10 @@ class EarlyStudentsViewModel extends BaseViewModel {
     ];
   }
 
-  List<EarlyLeaderboardEntry> _dailyEntries(List<_DailyRank> dailyRanks) {
+  List<EarlyLeaderboardEntry> _dailyEntries(
+    List<_DailyRank> dailyRanks,
+    Map<String, _PersonFilterData> metadata,
+  ) {
     return [
       for (final rank in dailyRanks)
         EarlyLeaderboardEntry(
@@ -181,12 +240,15 @@ class EarlyStudentsViewModel extends BaseViewModel {
           averageTimeInMinutes: _minutesSinceMidnight(rank.log.timestamp),
           validDays: 1,
           timeInText: DateFormat('hh:mm a').format(rank.log.timestamp),
+          gender: metadata[rank.log.personId]?.gender ?? '',
+          gradeLevel: metadata[rank.log.personId]?.gradeLevel ?? '',
         ),
     ];
   }
 
   List<EarlyLeaderboardEntry> _aggregateEntries(
     Map<String, List<_DailyRank>> dailyRankings,
+    Map<String, _PersonFilterData> metadata,
   ) {
     final totals = <String, _StudentTotal>{};
 
@@ -229,8 +291,33 @@ class EarlyStudentsViewModel extends BaseViewModel {
           bestDailyRank: sorted[index].bestDailyRank,
           averageTimeInMinutes: sorted[index].averageTimeInMinutes,
           validDays: sorted[index].validDays,
+          gender: metadata[sorted[index].personId]?.gender ?? '',
+          gradeLevel: metadata[sorted[index].personId]?.gradeLevel ?? '',
         ),
     ];
+  }
+
+  Future<Map<String, _PersonFilterData>> _loadPersonFilterData(
+    String schoolYearId,
+  ) async {
+    final sectionsQuery = await _app.repository.activeSectionsStream().first;
+    final gradeBySection = {
+      for (final doc in sectionsQuery.docs)
+        (doc.data()['name'] as String? ?? ''):
+            (doc.data()['gradeLevel'] as String? ?? ''),
+    };
+
+    if (selectedRole != PersonRole.student) return {};
+
+    final studentsQuery = await _app.repository.activeStudents(schoolYearId);
+    return {
+      for (final doc in studentsQuery.docs)
+        (doc.data()['lrn'] as String? ?? doc.id): _PersonFilterData(
+          gender: doc.data()['gender'] as String? ?? '',
+          gradeLevel:
+              gradeBySection[doc.data()['section'] as String? ?? ''] ?? '',
+        ),
+    };
   }
 
   int _pointsForRank(int rank) {
@@ -280,6 +367,24 @@ class EarlyStudentsViewModel extends BaseViewModel {
       label: DateFormat('MMMM yyyy').format(selected),
     );
   }
+}
+
+class _PersonFilterData {
+  const _PersonFilterData({required this.gender, required this.gradeLevel});
+
+  final String gender;
+  final String gradeLevel;
+}
+
+List<String> _filterOptions(Iterable<String> values) {
+  final options =
+      values
+          .map((value) => value.trim())
+          .where((value) => value.isNotEmpty)
+          .toSet()
+          .toList()
+        ..sort();
+  return options;
 }
 
 class _DailyRank {

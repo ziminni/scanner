@@ -1,24 +1,35 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:hive/hive.dart';
 
 import '../constants/enums.dart';
 import '../../models/models.dart';
 
 class OfflineQueueService {
-  static const _queueKey = 'pending_attendance_logs';
-  static const _gatePassQueueKey = 'pending_gate_pass_logs';
-  static const _activeSchoolYearKey = 'cached_active_school_year';
-  static const _personCacheKey = 'cached_people';
+  static const _attendanceBoxName = 'offline_pending_attendance_logs';
+  static const _gatePassBoxName = 'offline_pending_gate_pass_logs';
+  static const _schoolCacheBoxName = 'offline_school_cache';
+  static const _peopleBoxName = 'offline_people_cache';
+  static const _activeSchoolYearKey = 'active_school_year';
 
   OfflineQueueService(this._connectivity);
 
   final Connectivity _connectivity;
   final _syncRequests = StreamController<void>.broadcast();
+  Box<Map>? _attendanceBox;
+  Box<Map>? _gatePassBox;
+  Box<Map>? _schoolCacheBox;
+  Box<Map>? _peopleBox;
 
   Stream<void> get syncRequests => _syncRequests.stream;
+
+  Future<void> initialize() async {
+    _attendanceBox ??= await Hive.openBox<Map>(_attendanceBoxName);
+    _gatePassBox ??= await Hive.openBox<Map>(_gatePassBoxName);
+    _schoolCacheBox ??= await Hive.openBox<Map>(_schoolCacheBoxName);
+    _peopleBox ??= await Hive.openBox<Map>(_peopleBoxName);
+  }
 
   Future<void> startNetworkWatcher() async {
     _connectivity.onConnectivityChanged.listen((result) {
@@ -34,15 +45,11 @@ class OfflineQueueService {
   }
 
   Future<List<AttendanceLog>> loadPendingLogs() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getStringList(_queueKey) ?? const [];
-    return raw.map((item) {
-      final decoded = jsonDecode(item) as Map<String, dynamic>;
-      return AttendanceLog.fromMap(
-        decoded['id'] as String,
-        Map<String, dynamic>.from(decoded['data'] as Map),
-      );
-    }).toList();
+    final box = await _pendingAttendanceBox();
+    return box.values.map((item) {
+      final data = Map<String, dynamic>.from(item['data'] as Map);
+      return AttendanceLog.fromMap(item['id'] as String, data);
+    }).toList()..sort((a, b) => a.timestamp.compareTo(b.timestamp));
   }
 
   Future<void> enqueue(
@@ -57,8 +64,10 @@ class OfflineQueueService {
     )) {
       return;
     }
-    pending.add(log);
-    await _save(pending);
+    await (await _pendingAttendanceBox()).put(log.id, {
+      'id': log.id,
+      'data': _offlineMap(log),
+    });
   }
 
   Future<bool> hasPendingDuplicate(
@@ -73,22 +82,17 @@ class OfflineQueueService {
   }
 
   Future<List<GatePassLog>> loadPendingGatePassLogs() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getStringList(_gatePassQueueKey) ?? const [];
-    return raw.map((item) {
-      final decoded = jsonDecode(item) as Map<String, dynamic>;
-      return GatePassLog.fromMap(
-        decoded['id'] as String,
-        Map<String, dynamic>.from(decoded['data'] as Map),
-      );
-    }).toList();
+    final box = await _pendingGatePassBox();
+    return box.values.map((item) {
+      final data = Map<String, dynamic>.from(item['data'] as Map);
+      return GatePassLog.fromMap(item['id'] as String, data);
+    }).toList()..sort((a, b) => a.timestamp.compareTo(b.timestamp));
   }
 
   Future<void> enqueueGatePass(GatePassLog log) async {
-    final pending = await loadPendingGatePassLogs();
-    if (pending.any((item) => item.id == log.id)) return;
-    pending.add(log);
-    await _saveGatePassLogs(pending);
+    final box = await _pendingGatePassBox();
+    if (box.containsKey(log.id)) return;
+    await box.put(log.id, {'id': log.id, 'data': _offlineGatePassMap(log)});
   }
 
   Future<GatePassLog?> findPendingOpenGatePass({
@@ -125,23 +129,22 @@ class OfflineQueueService {
     final pending = await loadPendingGatePassLogs();
     final index = pending.indexWhere((log) => log.id == updatedLog.id);
     if (index == -1) return;
-    pending[index] = updatedLog;
-    await _saveGatePassLogs(pending);
+    await (await _pendingGatePassBox()).put(updatedLog.id, {
+      'id': updatedLog.id,
+      'data': _offlineGatePassMap(updatedLog),
+    });
   }
 
   Future<void> cacheActiveSchoolYear(SchoolYear schoolYear) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      _activeSchoolYearKey,
-      jsonEncode({'id': schoolYear.id, 'data': _schoolYearMap(schoolYear)}),
-    );
+    await (await _schoolCacheBoxInstance()).put(_activeSchoolYearKey, {
+      'id': schoolYear.id,
+      'data': _schoolYearMap(schoolYear),
+    });
   }
 
   Future<SchoolYear?> loadCachedActiveSchoolYear() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_activeSchoolYearKey);
-    if (raw == null) return null;
-    final decoded = jsonDecode(raw) as Map<String, dynamic>;
+    final decoded = (await _schoolCacheBoxInstance()).get(_activeSchoolYearKey);
+    if (decoded == null) return null;
     return SchoolYear.fromMap(
       decoded['id'] as String,
       Map<String, dynamic>.from(decoded['data'] as Map),
@@ -156,80 +159,46 @@ class OfflineQueueService {
     required String section,
     String assignedTimeIn = '07:00',
     String assignedTimeOut = '17:00',
+    String contactNumber = '',
   }) async {
-    final prefs = await SharedPreferences.getInstance();
-    final people = prefs.getStringList(_personCacheKey) ?? const [];
     final key = '$schoolYearId-$personId';
-    final next =
-        people
-            .map((item) => jsonDecode(item) as Map<String, dynamic>)
-            .where((item) => item['key'] != key)
-            .toList()
-          ..add({
-            'key': key,
-            'schoolYearId': schoolYearId,
-            'personId': personId,
-            'fullName': fullName,
-            'role': role,
-            'section': section,
-            'assignedTimeIn': assignedTimeIn,
-            'assignedTimeOut': assignedTimeOut,
-          });
-    await prefs.setStringList(_personCacheKey, next.map(jsonEncode).toList());
+    await (await _peopleBoxInstance()).put(key, {
+      'key': key,
+      'schoolYearId': schoolYearId,
+      'personId': personId,
+      'fullName': fullName,
+      'role': role,
+      'section': section,
+      'assignedTimeIn': assignedTimeIn,
+      'assignedTimeOut': assignedTimeOut,
+      'contactNumber': contactNumber,
+    });
   }
 
   Future<Map<String, dynamic>?> findCachedPerson({
     required String schoolYearId,
     required String personId,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
     final key = '$schoolYearId-$personId';
-    final people = prefs.getStringList(_personCacheKey) ?? const [];
-    for (final item in people) {
-      final decoded = jsonDecode(item) as Map<String, dynamic>;
-      if (decoded['key'] == key) return decoded;
-    }
-    return null;
+    final person = (await _peopleBoxInstance()).get(key);
+    return person == null ? null : Map<String, dynamic>.from(person);
   }
 
   Future<void> remove(String id) async {
-    final pending = await loadPendingLogs();
-    pending.removeWhere((log) => log.id == id);
-    await _save(pending);
+    await (await _pendingAttendanceBox()).delete(id);
   }
 
   Future<void> removeGatePass(String id) async {
-    final pending = await loadPendingGatePassLogs();
-    pending.removeWhere((log) => log.id == id);
-    await _saveGatePassLogs(pending);
+    await (await _pendingGatePassBox()).delete(id);
   }
 
   Future<void> markFailed(String id) async {
-    final pending = await loadPendingLogs();
-    await _save(pending);
-  }
-
-  Future<void> _save(List<AttendanceLog> logs) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList(
-      _queueKey,
-      logs
-          .map((log) => jsonEncode({'id': log.id, 'data': _offlineMap(log)}))
-          .toList(),
-    );
-  }
-
-  Future<void> _saveGatePassLogs(List<GatePassLog> logs) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList(
-      _gatePassQueueKey,
-      logs
-          .map(
-            (log) =>
-                jsonEncode({'id': log.id, 'data': _offlineGatePassMap(log)}),
-          )
-          .toList(),
-    );
+    final box = await _pendingAttendanceBox();
+    final item = box.get(id);
+    if (item == null) return;
+    final data = Map<String, dynamic>.from(item['data'] as Map);
+    data['syncStatus'] = SyncStatus.failedSync.name;
+    await box.put(id, {'id': id, 'data': data});
   }
 
   Map<String, dynamic> _offlineMap(AttendanceLog log) => {
@@ -268,5 +237,21 @@ class OfflineQueueService {
       final difference = item.timestamp.difference(log.timestamp).abs();
       return difference <= window;
     });
+  }
+
+  Future<Box<Map>> _pendingAttendanceBox() async {
+    return _attendanceBox ??= await Hive.openBox<Map>(_attendanceBoxName);
+  }
+
+  Future<Box<Map>> _pendingGatePassBox() async {
+    return _gatePassBox ??= await Hive.openBox<Map>(_gatePassBoxName);
+  }
+
+  Future<Box<Map>> _schoolCacheBoxInstance() async {
+    return _schoolCacheBox ??= await Hive.openBox<Map>(_schoolCacheBoxName);
+  }
+
+  Future<Box<Map>> _peopleBoxInstance() async {
+    return _peopleBox ??= await Hive.openBox<Map>(_peopleBoxName);
   }
 }

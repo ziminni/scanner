@@ -12,15 +12,19 @@ class MetricCard extends StatelessWidget {
     required this.label,
     required this.value,
     required this.icon,
+    this.color,
   });
 
   final String label;
   final String value;
   final IconData icon;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final activeColor = color ?? theme.colorScheme.primary;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
@@ -40,18 +44,21 @@ class MetricCard extends StatelessWidget {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: theme.colorScheme.primaryContainer,
+              color: activeColor.withAlpha(28),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(icon, color: theme.colorScheme.onPrimaryContainer),
+            child: Icon(icon, color: activeColor),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
                   label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.labelLarge?.copyWith(
                     color: theme.colorScheme.onSurface.withAlpha(204),
                     fontWeight: FontWeight.w600,
@@ -60,6 +67,8 @@ class MetricCard extends StatelessWidget {
                 const SizedBox(height: 6),
                 Text(
                   value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.headlineMedium?.copyWith(
                     fontWeight: FontWeight.w800,
                   ),

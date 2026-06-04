@@ -8,9 +8,10 @@ import '../constants/enums.dart';
 import '../../models/models.dart';
 import 'audit_service.dart';
 import 'offline_queue_service.dart';
+import 'sms_notification_service.dart';
 
 class AttendanceService {
-  AttendanceService(this._firestore, this._queue, this._audit) {
+  AttendanceService(this._firestore, this._queue, this._audit, this._sms) {
     _queue.syncRequests.listen((_) {
       unawaited(syncPendingLogs());
       unawaited(syncPendingGatePassLogs());
@@ -20,6 +21,7 @@ class AttendanceService {
   final FirebaseFirestore _firestore;
   final OfflineQueueService _queue;
   final AuditService _audit;
+  final SmsNotificationService _sms;
   final _uuid = const Uuid();
   SchoolYear? _activeSchoolYearCache;
 
@@ -133,6 +135,7 @@ class AttendanceService {
     required AppUser scanner,
     required String deviceId,
   }) async {
+    final personId = _normalizeScannedId(scannedId);
     final now = DateTime.now();
     final schoolYear = await activeSchoolYear();
     if (schoolYear == null) {
@@ -142,16 +145,16 @@ class AttendanceService {
     }
 
     final online = await _queue.isOnline;
-    final person = await _findPerson(scannedId, schoolYear.id, online: online);
+    final person = await _findPerson(personId, schoolYear.id, online: online);
     if (person == null) {
-      throw StateError('No active student or teacher found for ID $scannedId.');
+      throw StateError('No active student or teacher found for ID $personId.');
     }
 
     final settings = await loadSettings();
     final status = _attendanceStatus(type, person, now, settings);
     final log = AttendanceLog(
       id: _uuid.v4(),
-      personId: scannedId,
+      personId: person.id,
       fullName: person.fullName,
       personRole: person.role,
       section: person.section,
@@ -181,6 +184,9 @@ class AttendanceService {
         log,
         duplicateWindowMinutes: settings.duplicateWindowMinutes,
       );
+      unawaited(
+        _sms.notifyAttendance(log: log, recipient: person.contactNumber),
+      );
       return log;
     }
 
@@ -193,6 +199,7 @@ class AttendanceService {
     }
 
     await _writeLog(log);
+    unawaited(_sms.notifyAttendance(log: log, recipient: person.contactNumber));
     return log;
   }
 
@@ -204,6 +211,7 @@ class AttendanceService {
     required AppUser scanner,
     required String deviceId,
   }) async {
+    final personId = _normalizeScannedId(scannedId);
     final trimmedReason = reason.trim();
     if (trimmedReason.isEmpty) {
       throw StateError('Please enter the reason for going outside.');
@@ -215,7 +223,7 @@ class AttendanceService {
       );
     }
 
-    await validateGatePassExitAllowed(scannedId);
+    await validateGatePassExitAllowed(personId);
 
     final now = DateTime.now();
     final schoolYear = await activeSchoolYear();
@@ -226,13 +234,13 @@ class AttendanceService {
     }
 
     final online = await _queue.isOnline;
-    final person = await _findPerson(scannedId, schoolYear.id, online: online);
+    final person = await _findPerson(personId, schoolYear.id, online: online);
     if (person == null) {
-      throw StateError('No active student or teacher found for ID $scannedId.');
+      throw StateError('No active student or teacher found for ID $personId.');
     }
     final log = GatePassLog(
       id: _uuid.v4(),
-      personId: scannedId,
+      personId: person.id,
       fullName: person.fullName,
       personRole: person.role,
       section: person.section,
@@ -264,14 +272,21 @@ class AttendanceService {
 
     if (!online) {
       await _queue.enqueueGatePass(log);
+      unawaited(
+        _sms.notifyGatePassExit(log: log, recipient: person.contactNumber),
+      );
       return log;
     }
 
     await _writeGatePassLog(log);
+    unawaited(
+      _sms.notifyGatePassExit(log: log, recipient: person.contactNumber),
+    );
     return log;
   }
 
   Future<void> validateGatePassExitAllowed(String scannedId) async {
+    final personId = _normalizeScannedId(scannedId);
     final schoolYear = await activeSchoolYear();
     if (schoolYear == null) {
       throw StateError(
@@ -280,13 +295,13 @@ class AttendanceService {
     }
 
     final online = await _queue.isOnline;
-    final person = await _findPerson(scannedId, schoolYear.id, online: online);
+    final person = await _findPerson(personId, schoolYear.id, online: online);
     if (person == null) {
-      throw StateError('No active student or teacher found for ID $scannedId.');
+      throw StateError('No active student or teacher found for ID $personId.');
     }
     final existingGatePass = await _findUnclosedGatePass(
       schoolYearId: schoolYear.id,
-      personId: scannedId,
+      personId: person.id,
       online: online,
     );
     if (existingGatePass != null) {
@@ -301,6 +316,7 @@ class AttendanceService {
     required AppUser scanner,
     required String deviceId,
   }) async {
+    final personId = _normalizeScannedId(scannedId);
     final now = DateTime.now();
     final schoolYear = await activeSchoolYear();
     if (schoolYear == null) {
@@ -310,15 +326,15 @@ class AttendanceService {
     }
 
     final online = await _queue.isOnline;
-    final person = await _findPerson(scannedId, schoolYear.id, online: online);
+    final person = await _findPerson(personId, schoolYear.id, online: online);
     if (person == null) {
-      throw StateError('No active student or teacher found for ID $scannedId.');
+      throw StateError('No active student or teacher found for ID $personId.');
     }
 
     if (!online) {
       final pending = await _queue.findPendingOpenGatePass(
         schoolYearId: schoolYear.id,
-        personId: scannedId,
+        personId: person.id,
       );
       if (pending == null) {
         throw StateError(
@@ -327,6 +343,12 @@ class AttendanceService {
       }
       final updated = _returnedGatePassLog(pending, now, offline: true);
       await _queue.updatePendingGatePass(updated);
+      unawaited(
+        _sms.notifyGatePassReturn(
+          log: updated,
+          recipient: person.contactNumber,
+        ),
+      );
       return updated;
     }
 
@@ -334,7 +356,7 @@ class AttendanceService {
         .collection('school_years')
         .doc(schoolYear.id)
         .collection('gate_pass_logs')
-        .where('personId', isEqualTo: scannedId)
+        .where('personId', isEqualTo: person.id)
         .where('status', isEqualTo: GatePassStatus.outside.name)
         .get();
 
@@ -352,6 +374,9 @@ class AttendanceService {
         .collection('gate_pass_logs')
         .doc(log.id)
         .set(updated.toMap(), SetOptions(merge: true));
+    unawaited(
+      _sms.notifyGatePassReturn(log: updated, recipient: person.contactNumber),
+    );
     await _audit.record(
       action: 'gate_pass_return_logged',
       actorId: scanner.id,
@@ -591,13 +616,23 @@ class AttendanceService {
     String schoolYearId, {
     required bool online,
   }) async {
+    final candidates = _idCandidates(id);
     if (!online) {
-      final cached = await _queue.findCachedPerson(
-        schoolYearId: schoolYearId,
-        personId: id,
-      );
+      Map<String, dynamic>? cached;
+      String matchedId = id;
+      for (final candidate in candidates) {
+        cached = await _queue.findCachedPerson(
+          schoolYearId: schoolYearId,
+          personId: candidate,
+        );
+        if (cached != null) {
+          matchedId = candidate;
+          break;
+        }
+      }
       if (cached == null) return null;
       return _PersonMatch(
+        id: cached['personId'] as String? ?? matchedId,
         fullName: cached['fullName'] as String? ?? '',
         role: (cached['role'] as String? ?? 'student') == 'teacher'
             ? PersonRole.teacher
@@ -605,76 +640,122 @@ class AttendanceService {
         section: cached['section'] as String? ?? '',
         assignedTimeIn: cached['assignedTimeIn'] as String? ?? '07:00',
         assignedTimeOut: cached['assignedTimeOut'] as String? ?? '17:00',
+        contactNumber: cached['contactNumber'] as String? ?? '',
       );
     }
 
-    final studentQuery = await _firestore
-        .collection('school_years')
-        .doc(schoolYearId)
-        .collection('students')
-        .where('lrn', isEqualTo: id)
-        .where('archived', isEqualTo: false)
-        .limit(1)
-        .get();
-    if (studentQuery.docs.isNotEmpty) {
-      final student = Student.fromDoc(studentQuery.docs.first);
-      await _queue.cachePerson(
-        schoolYearId: schoolYearId,
-        personId: id,
-        fullName: student.fullName,
-        role: PersonRole.student.name,
-        section: student.section,
-      );
-      return _PersonMatch(
-        fullName: student.fullName,
-        role: PersonRole.student,
-        section: student.section,
-      );
+    for (final candidate in candidates) {
+      final studentQuery = await _firestore
+          .collection('school_years')
+          .doc(schoolYearId)
+          .collection('students')
+          .where('lrn', isEqualTo: candidate)
+          .limit(1)
+          .get();
+      final studentDoc = studentQuery.docs
+          .where((doc) => doc.data()['archived'] != true)
+          .firstOrNull;
+      if (studentDoc != null) {
+        final student = Student.fromDoc(studentDoc);
+        await _queue.cachePerson(
+          schoolYearId: schoolYearId,
+          personId: student.lrn,
+          fullName: student.fullName,
+          role: PersonRole.student.name,
+          section: student.section,
+          contactNumber: student.guardianContact,
+        );
+        return _PersonMatch(
+          id: student.lrn,
+          fullName: student.fullName,
+          role: PersonRole.student,
+          section: student.section,
+          contactNumber: student.guardianContact,
+        );
+      }
     }
 
-    final teacherQuery = await _firestore
-        .collection('school_years')
-        .doc(schoolYearId)
-        .collection('teachers')
-        .where('teacherId', isEqualTo: id)
-        .where('archived', isEqualTo: false)
-        .limit(1)
-        .get();
-    if (teacherQuery.docs.isNotEmpty) {
-      final teacher = Teacher.fromDoc(teacherQuery.docs.first);
-      await _queue.cachePerson(
-        schoolYearId: schoolYearId,
-        personId: id,
-        fullName: teacher.fullName,
-        role: PersonRole.teacher.name,
-        section: '',
-        assignedTimeIn: teacher.assignedTimeIn,
-        assignedTimeOut: teacher.assignedTimeOut,
-      );
-      return _PersonMatch(
-        fullName: teacher.fullName,
-        role: PersonRole.teacher,
-        section: '',
-        assignedTimeIn: teacher.assignedTimeIn,
-        assignedTimeOut: teacher.assignedTimeOut,
-      );
+    for (final candidate in candidates) {
+      final teacherQuery = await _firestore
+          .collection('school_years')
+          .doc(schoolYearId)
+          .collection('teachers')
+          .where('teacherId', isEqualTo: candidate)
+          .limit(1)
+          .get();
+      final teacherDoc = teacherQuery.docs
+          .where((doc) => doc.data()['archived'] != true)
+          .firstOrNull;
+      if (teacherDoc != null) {
+        final teacher = Teacher.fromDoc(teacherDoc);
+        await _queue.cachePerson(
+          schoolYearId: schoolYearId,
+          personId: teacher.teacherId,
+          fullName: teacher.fullName,
+          role: PersonRole.teacher.name,
+          section: '',
+          assignedTimeIn: teacher.assignedTimeIn,
+          assignedTimeOut: teacher.assignedTimeOut,
+          contactNumber: teacher.contactNumber,
+        );
+        return _PersonMatch(
+          id: teacher.teacherId,
+          fullName: teacher.fullName,
+          role: PersonRole.teacher,
+          section: '',
+          assignedTimeIn: teacher.assignedTimeIn,
+          assignedTimeOut: teacher.assignedTimeOut,
+          contactNumber: teacher.contactNumber,
+        );
+      }
     }
     return null;
+  }
+
+  String _normalizeScannedId(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return '';
+    final labeledMatch = RegExp(
+      r'(?:LRN|Teacher\s*ID|ID)\s*[:#-]?\s*([A-Za-z0-9._-]+)',
+      caseSensitive: false,
+    ).firstMatch(trimmed);
+    if (labeledMatch != null) return labeledMatch.group(1)!.trim();
+    if (!trimmed.contains(RegExp(r'\s'))) return trimmed;
+    final compactMatch = RegExp(r'[A-Za-z0-9._-]{4,}').firstMatch(trimmed);
+    return compactMatch?.group(0)?.trim() ?? trimmed;
+  }
+
+  List<String> _idCandidates(String id) {
+    final trimmed = id.trim();
+    final candidates = <String>{};
+    if (trimmed.isNotEmpty) candidates.add(trimmed);
+    final withoutTrailingDecimal = trimmed.replaceFirst(RegExp(r'\.0$'), '');
+    if (withoutTrailingDecimal.isNotEmpty) {
+      candidates.add(withoutTrailingDecimal);
+    }
+    if (RegExp(r'^\d+$').hasMatch(withoutTrailingDecimal)) {
+      candidates.add('$withoutTrailingDecimal.0');
+    }
+    return candidates.toList();
   }
 }
 
 class _PersonMatch {
   const _PersonMatch({
+    required this.id,
     required this.fullName,
     required this.role,
     required this.section,
     this.assignedTimeIn = '07:00',
     this.assignedTimeOut = '17:00',
+    this.contactNumber = '',
   });
 
+  final String id;
   final String fullName;
   final PersonRole role;
   final String section;
   final String assignedTimeIn;
   final String assignedTimeOut;
+  final String contactNumber;
 }

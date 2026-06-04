@@ -14,13 +14,15 @@ import 'attendance_service.dart';
 import 'audit_service.dart';
 import 'auth_service.dart';
 import 'offline_queue_service.dart';
+import 'sms_notification_service.dart';
 
 class AppController extends ChangeNotifier {
   AppController() {
     audit = AuditService(firestore);
+    sms = SmsNotificationService();
     offlineQueue = OfflineQueueService(Connectivity());
     auth = AuthService(firebaseAuth, firestore, audit);
-    attendance = AttendanceService(firestore, offlineQueue, audit);
+    attendance = AttendanceService(firestore, offlineQueue, audit, sms);
     admin = AdminService(firestore, firebaseAuth, storage, audit);
     repository = FirebaseRepository(firestore, audit);
   }
@@ -30,6 +32,7 @@ class AppController extends ChangeNotifier {
   final FirebaseStorage storage = FirebaseStorage.instance;
 
   late final AuditService audit;
+  late final SmsNotificationService sms;
   late final OfflineQueueService offlineQueue;
   late final AuthService auth;
   late final AttendanceService attendance;
@@ -41,6 +44,7 @@ class AppController extends ChangeNotifier {
   String? authError;
 
   Future<void> initialize() async {
+    await offlineQueue.initialize();
     await offlineQueue.startNetworkWatcher();
     if (kIsWeb) {
       await firebaseAuth.setPersistence(Persistence.LOCAL);
@@ -76,6 +80,21 @@ class AppController extends ChangeNotifier {
     await auth.logout();
     currentUser = null;
     notifyListeners();
+  }
+
+  Future<AppUser> updateProfile({
+    required String fullName,
+    required String email,
+    required bool sendPasswordReset,
+  }) async {
+    final updated = await auth.updateCurrentUserProfile(
+      fullName: fullName,
+      email: email,
+      sendPasswordReset: sendPasswordReset,
+    );
+    currentUser = updated;
+    notifyListeners();
+    return updated;
   }
 
   void logoutForUnauthorizedAccess() {
