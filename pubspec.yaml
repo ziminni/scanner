@@ -41,7 +41,7 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
-    - assets/images/school_logo.jpeg
+    - assets/images/
     - assets/img/logo.jpg
     - assets/templates/Students-template.xlsx
     - assets/templates/Teachers-template.xlsx
