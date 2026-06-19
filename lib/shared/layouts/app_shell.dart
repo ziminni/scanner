@@ -200,7 +200,7 @@ class AppShell extends StatelessWidget {
         ),
         _NavItem(
           AppRoutes.earlyStudents,
-          'Early Students',
+          'Early Attendance',
           'Early',
           Icons.emoji_events_outlined,
           Icons.emoji_events,

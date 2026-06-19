@@ -16,6 +16,7 @@ class ImportStudentsViewModel extends BaseViewModel {
     'lastname',
     'firstname',
     'middlename',
+    'gender',
     'birthdate',
     'address',
     'guardianname',
@@ -196,10 +197,11 @@ class ImportStudentsViewModel extends BaseViewModel {
         'lastName': lastName,
         'firstName': firstName,
         'middleName': _text(row, 3),
-        'birthdate': _date(row, 4),
-        'address': _text(row, 5),
-        'guardianName': _text(row, 6),
-        'guardianContact': _text(row, 7),
+        'gender': _gender(row, 4, rowNumber),
+        'birthdate': _date(row, 5),
+        'address': _text(row, 6),
+        'guardianName': _text(row, 7),
+        'guardianContact': _text(row, 8),
         'section': section,
         'status': 'Active',
         'schoolYearId': schoolYearId,
@@ -254,6 +256,7 @@ class ImportStudentsViewModel extends BaseViewModel {
       'lastname' => 'Last name',
       'firstname' => 'First name',
       'middlename' => 'Middle name',
+      'gender' => 'Gender',
       'birthdate' => 'Birthdate',
       'address' => 'Address',
       'guardianname' => 'Guardian name',
@@ -267,6 +270,17 @@ class ImportStudentsViewModel extends BaseViewModel {
     final value = row[index];
     if (value == null) return '';
     return value.toString().trim();
+  }
+
+  String _gender(List<dynamic> row, int index, int rowNumber) {
+    final value = _text(row, index).toLowerCase();
+    return switch (value) {
+      'male' || 'm' => 'Male',
+      'female' || 'f' => 'Female',
+      _ => throw FormatException(
+        'Row $rowNumber has an invalid gender. Use Male or Female.',
+      ),
+    };
   }
 
   Timestamp? _date(List<dynamic> row, int index) {

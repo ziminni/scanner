@@ -281,6 +281,14 @@ class _CollectionTableBodyState extends State<_CollectionTableBody> {
     if (lower == 'counts' && value is Map) {
       return _CountsCell(counts: value);
     }
+    if (lower == 'birthdate') {
+      final date = switch (value) {
+        Timestamp timestamp => timestamp.toDate(),
+        DateTime dateTime => dateTime,
+        _ => null,
+      };
+      return Text(date == null ? '-' : DateFormat('MMM d, yyyy').format(date));
+    }
     if (lower.contains('status')) {
       final label = value?.toString() ?? '-';
       final type = label.toLowerCase().contains('late')

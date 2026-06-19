@@ -9,6 +9,7 @@ class Teacher {
     required this.lastName,
     required this.firstName,
     this.middleName = '',
+    this.gender = '',
     this.birthdate,
     this.address = '',
     this.contactNumber = '',
@@ -23,6 +24,7 @@ class Teacher {
   final String lastName;
   final String firstName;
   final String middleName;
+  final String gender;
   final DateTime? birthdate;
   final String address;
   final String contactNumber;
@@ -45,6 +47,7 @@ class Teacher {
       lastName: data['lastName'] as String? ?? '',
       firstName: data['firstName'] as String? ?? '',
       middleName: data['middleName'] as String? ?? '',
+      gender: data['gender'] as String? ?? '',
       birthdate: toDate(data['birthdate']),
       address: data['address'] as String? ?? '',
       contactNumber: data['contactNumber'] as String? ?? '',

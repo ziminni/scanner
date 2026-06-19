@@ -109,6 +109,12 @@ class _AddStudentDialogState extends State<_AddStudentDialog> {
                                   ),
                                 ),
                         ),
+                      GenderDropdownField(
+                        value: _viewModel.selectedGender,
+                        enabled: !_viewModel.busy,
+                        onChanged: _viewModel.selectGender,
+                      ),
+                      const SizedBox(height: 14),
                       DropdownButtonFormField<String>(
                         initialValue: _viewModel.selectedSection,
                         decoration: const InputDecoration(
@@ -176,7 +182,10 @@ class _AddStudentDialogState extends State<_AddStudentDialog> {
                     )
                   : const Icon(Icons.add),
               label: const Text('Add'),
-              onPressed: _viewModel.busy || _viewModel.selectedSection == null
+              onPressed:
+                  _viewModel.busy ||
+                      _viewModel.selectedSection == null ||
+                      _viewModel.selectedGender == null
                   ? null
                   : () async {
                       await _viewModel.addStudent();

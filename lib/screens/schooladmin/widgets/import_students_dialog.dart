@@ -34,7 +34,7 @@ class _ImportStudentsDialogState extends State<_ImportStudentsDialog> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Spreadsheet columns: LRN, last name, first name, middle name, birthdate, address, guardian name, guardian contact.',
+                    'Spreadsheet columns: LRN, last name, first name, middle name, gender, birthdate, address, guardian name, guardian contact.',
                   ),
                   const SizedBox(height: 16),
                   StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(

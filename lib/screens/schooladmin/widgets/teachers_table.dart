@@ -1,10 +1,15 @@
 part of '../teachers_page.dart';
 
 class _TeachersTable extends StatefulWidget {
-  const _TeachersTable({required this.search, required this.scheduleFilter});
+  const _TeachersTable({
+    required this.search,
+    required this.scheduleFilter,
+    required this.genderFilter,
+  });
 
   final String search;
   final String scheduleFilter;
+  final String genderFilter;
 
   @override
   State<_TeachersTable> createState() => _TeachersTableState();
@@ -20,7 +25,8 @@ class _TeachersTableState extends State<_TeachersTable> {
   void didUpdateWidget(covariant _TeachersTable oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.search != widget.search ||
-        oldWidget.scheduleFilter != widget.scheduleFilter) {
+        oldWidget.scheduleFilter != widget.scheduleFilter ||
+        oldWidget.genderFilter != widget.genderFilter) {
       _currentPage = 0;
     }
   }
@@ -47,6 +53,11 @@ class _TeachersTableState extends State<_TeachersTable> {
               final data = doc.data();
               if (widget.scheduleFilter.isNotEmpty &&
                   _teacherSchedule(data) != widget.scheduleFilter) {
+                return false;
+              }
+              if (widget.genderFilter.isNotEmpty &&
+                  (data['gender'] as String? ?? '').toLowerCase() !=
+                      widget.genderFilter.toLowerCase()) {
                 return false;
               }
               if (query.isEmpty) return true;
@@ -78,6 +89,7 @@ class _TeachersTableState extends State<_TeachersTable> {
                       columns: const [
                         DataColumn(label: Text('Teacher ID')),
                         DataColumn(label: Text('Name')),
+                        DataColumn(label: Text('Gender')),
                         DataColumn(label: Text('Birthdate')),
                         DataColumn(label: Text('Address')),
                         DataColumn(label: Text('Contact')),
@@ -92,6 +104,9 @@ class _TeachersTableState extends State<_TeachersTable> {
                                 Text(doc.data()['teacherId'] as String? ?? '-'),
                               ),
                               DataCell(Text(_teacherName(doc.data()))),
+                              DataCell(
+                                Text(doc.data()['gender'] as String? ?? '-'),
+                              ),
                               DataCell(Text(_teacherBirthdate(doc.data()))),
                               DataCell(
                                 Text(doc.data()['address'] as String? ?? '-'),

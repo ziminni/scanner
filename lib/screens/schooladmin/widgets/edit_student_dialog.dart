@@ -19,6 +19,7 @@ class _EditStudentDialogState extends State<_EditStudentDialog> {
   late final Map<String, TextEditingController> _controllers;
   DateTime? _birthdate;
   String? _selectedSection;
+  String? _selectedGender;
   bool _saving = false;
   String? _error;
 
@@ -27,12 +28,16 @@ class _EditStudentDialogState extends State<_EditStudentDialog> {
     super.initState();
     _controllers = {
       for (final field in studentFields)
-        if (field != 'birthdate' && field != 'section' && field != 'status')
+        if (field != 'birthdate' &&
+            field != 'gender' &&
+            field != 'section' &&
+            field != 'status')
           field: TextEditingController(
             text: widget.data[field]?.toString() ?? '',
           ),
     };
     _birthdate = _dateFromValue(widget.data['birthdate']);
+    _selectedGender = widget.data['gender'] as String?;
     _selectedSection = widget.data['section'] as String?;
   }
 
@@ -87,6 +92,15 @@ class _EditStudentDialogState extends State<_EditStudentDialog> {
                     child: BirthdateField(
                       value: _birthdate,
                       onChanged: (date) => setState(() => _birthdate = date),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 220,
+                    child: GenderDropdownField(
+                      value: _selectedGender,
+                      enabled: !_saving,
+                      onChanged: (gender) =>
+                          setState(() => _selectedGender = gender),
                     ),
                   ),
                   SizedBox(
@@ -150,6 +164,11 @@ class _EditStudentDialogState extends State<_EditStudentDialog> {
       setState(() => _error = 'Section is required.');
       return;
     }
+    final gender = _selectedGender;
+    if (gender == null) {
+      setState(() => _error = 'Gender is required.');
+      return;
+    }
 
     setState(() {
       _saving = true;
@@ -167,6 +186,7 @@ class _EditStudentDialogState extends State<_EditStudentDialog> {
             'birthdate': _birthdate == null
                 ? null
                 : Timestamp.fromDate(_birthdate!),
+            'gender': gender,
             'section': section,
             'updatedAt': FieldValue.serverTimestamp(),
           }, SetOptions(merge: true));

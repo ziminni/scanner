@@ -26,6 +26,7 @@ class CrudViewModel extends BaseViewModel {
   DateTime? birthdate;
   TimeOfDay? assignedTimeIn;
   TimeOfDay? assignedTimeOut;
+  String? selectedGender;
   TeacherOption? selectedAdviser;
 
   @override
@@ -55,12 +56,21 @@ class CrudViewModel extends BaseViewModel {
     notifyListeners();
   }
 
+  void setGender(String? gender) {
+    selectedGender = gender;
+    notifyListeners();
+  }
+
   void setAdviser(TeacherOption? teacher) {
     selectedAdviser = teacher;
     notifyListeners();
   }
 
   Future<void> addRecord() async {
+    if (fields.contains('gender') && selectedGender == null) {
+      setError('Gender is required.');
+      return;
+    }
     final schoolYear = collection == 'sections'
         ? null
         : await _app.attendance.activeSchoolYear();
@@ -74,6 +84,7 @@ class CrudViewModel extends BaseViewModel {
         entry.key: entry.value.text.trim(),
       if (fields.contains('birthdate'))
         'birthdate': birthdate == null ? null : Timestamp.fromDate(birthdate!),
+      if (fields.contains('gender')) 'gender': selectedGender ?? '',
       if (fields.contains('adviser')) ...{
         'adviser': selectedAdviser?.name ?? '',
         'adviserTeacherId': selectedAdviser?.teacherId ?? '',
@@ -114,7 +125,7 @@ class CrudViewModel extends BaseViewModel {
   }
 
   bool _usesDropdown(String field) =>
-      collection == 'sections' && field == 'adviser';
+      (collection == 'sections' && field == 'adviser') || field == 'gender';
 
   bool _usesTimePicker(String field) =>
       collection == 'teachers' &&

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../core/services/app_controller.dart';
 import '../../shared/widgets/admin_widgets.dart';
 import '../../shared/widgets/form_fields.dart';
+import '../../shared/widgets/gender_dropdown_field.dart';
 import 'viewmodels/import_students_viewmodel.dart';
 import 'viewmodels/students_viewmodel.dart';
 
@@ -21,6 +22,7 @@ class StudentsPage extends StatefulWidget {
 class _StudentsPageState extends State<StudentsPage> {
   final _search = TextEditingController();
   String _sectionFilter = '';
+  String _genderFilter = '';
 
   @override
   void dispose() {
@@ -45,6 +47,7 @@ class _StudentsPageState extends State<StudentsPage> {
               columns: [
                 'lrn',
                 'fullName',
+                'gender',
                 'birthdate',
                 'section',
                 'archivedAt',
@@ -91,10 +94,13 @@ class _StudentsPageState extends State<StudentsPage> {
               return _StudentsFilterBar(
                 search: _search,
                 sectionFilter: _sectionFilter,
+                genderFilter: _genderFilter,
                 sections: sectionOptions,
                 onSearchChanged: () => setState(() {}),
                 onSectionChanged: (value) =>
                     setState(() => _sectionFilter = value),
+                onGenderChanged: (value) =>
+                    setState(() => _genderFilter = value),
               );
             },
           ),
@@ -108,7 +114,10 @@ class _StudentsPageState extends State<StudentsPage> {
             columns: studentTableFields,
             schoolYearScoped: true,
             search: _search.text,
-            filters: {if (_sectionFilter.isNotEmpty) 'section': _sectionFilter},
+            filters: {
+              if (_sectionFilter.isNotEmpty) 'section': _sectionFilter,
+              if (_genderFilter.isNotEmpty) 'gender': _genderFilter,
+            },
             onEdit: _openEditStudentDialog,
           ),
         ],
@@ -121,25 +130,29 @@ class _StudentsFilterBar extends StatelessWidget {
   const _StudentsFilterBar({
     required this.search,
     required this.sectionFilter,
+    required this.genderFilter,
     required this.sections,
     required this.onSearchChanged,
     required this.onSectionChanged,
+    required this.onGenderChanged,
   });
 
   final TextEditingController search;
   final String sectionFilter;
+  final String genderFilter;
   final List<String> sections;
   final VoidCallback onSearchChanged;
   final ValueChanged<String> onSectionChanged;
+  final ValueChanged<String> onGenderChanged;
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final compact = constraints.maxWidth < 560;
+        final compact = constraints.maxWidth < 760;
         final searchWidth = compact
             ? constraints.maxWidth
-            : (constraints.maxWidth - 172).clamp(360.0, 720.0).toDouble();
+            : (constraints.maxWidth - 372).clamp(320.0, 720.0).toDouble();
         return SizedBox(
           width: constraints.maxWidth,
           child: Wrap(
@@ -164,6 +177,14 @@ class _StudentsFilterBar extends StatelessWidget {
                 value: sectionFilter,
                 options: sections,
                 onChanged: onSectionChanged,
+              ),
+              SizedBox(
+                width: 180,
+                child: GenderDropdownField(
+                  value: genderFilter,
+                  includeAll: true,
+                  onChanged: (value) => onGenderChanged(value ?? ''),
+                ),
               ),
             ],
           ),

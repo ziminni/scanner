@@ -1,5 +1,6 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../core/services/app_controller.dart';
 import '../../core/utils/download_file.dart';
@@ -22,6 +23,15 @@ class ReportsExportPage extends StatelessWidget {
             description:
                 'Download every attendance scan recorded in the active school year since scanning started.',
             icon: Icons.fact_check_outlined,
+            reportType: _ReportType.attendance,
+            formats: [_ReportFormat.excel, _ReportFormat.pdf],
+          ),
+          _ReportExportCard(
+            title: 'All Gate Pass Logs',
+            description:
+                'Download every gate pass exit and return record from the active school year.',
+            icon: Icons.directions_walk_outlined,
+            reportType: _ReportType.gatePass,
             formats: [_ReportFormat.excel, _ReportFormat.pdf],
           ),
           _TemplateDownloadCard(
@@ -30,7 +40,7 @@ class ReportsExportPage extends StatelessWidget {
                 'Download the spreadsheet template for bulk importing students.',
             icon: Icons.school_outlined,
             fileName: 'Students-template.xlsx',
-            assetPath: 'assets/templates/Students-template.xlsx',
+            assetPath: 'assets/templates/Students-template-v3.xlsx',
           ),
           _TemplateDownloadCard(
             title: 'Teacher Import Template',
@@ -38,7 +48,7 @@ class ReportsExportPage extends StatelessWidget {
                 'Download the spreadsheet template for bulk importing teachers.',
             icon: Icons.badge_outlined,
             fileName: 'Teachers-template.xlsx',
-            assetPath: 'assets/templates/Teachers-template.xlsx',
+            assetPath: 'assets/templates/Teachers-template-v2.xlsx',
           ),
         ],
       ),
@@ -120,29 +130,12 @@ class _TemplateDownloadCard extends StatelessWidget {
   Future<void> _downloadTemplate(BuildContext context) async {
     final messenger = ScaffoldMessenger.of(context);
     try {
-      final bytes = await _loadTemplateBytes();
-      downloadBytes(
-        fileName: fileName,
-        bytes: bytes,
-        mimeType:
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      );
+      downloadAsset(assetPath: assetPath, fileName: fileName);
       messenger.showSnackBar(SnackBar(content: Text('$title downloaded.')));
     } catch (error) {
       messenger.showSnackBar(
         SnackBar(content: Text('Could not download template: $error')),
       );
-    }
-  }
-
-  Future<Uint8List> _loadTemplateBytes() async {
-    try {
-      final data = await rootBundle.load(assetPath);
-      return data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
-    } catch (_) {
-      final bundle = NetworkAssetBundle(Uri.base);
-      final data = await bundle.load('assets/$assetPath');
-      return data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
     }
   }
 }
@@ -152,12 +145,14 @@ class _ReportExportCard extends StatefulWidget {
     required this.title,
     required this.description,
     required this.icon,
+    required this.reportType,
     required this.formats,
   });
 
   final String title;
   final String description;
   final IconData icon;
+  final _ReportType reportType;
   final List<_ReportFormat> formats;
 
   @override
@@ -258,32 +253,44 @@ class _ReportExportCardState extends State<_ReportExportCard> {
         return;
       }
 
-      final snapshot = await app.repository.attendanceLogsAll(
-        schoolYearId: schoolYear.id,
-      );
-      final logs = snapshot.docs.map(AttendanceLog.fromDoc).toList();
-      if (logs.isEmpty) {
+      final snapshot = await app.repository
+          .schoolYearCollection(schoolYear.id, widget.reportType.collectionName)
+          .get();
+      if (snapshot.docs.isEmpty) {
         messenger.showSnackBar(
-          const SnackBar(content: Text('No attendance logs to export yet.')),
+          SnackBar(
+            content: Text(
+              'No ${widget.reportType.emptyLabel} logs to export yet.',
+            ),
+          ),
         );
         return;
       }
 
-      final bytes = format == _ReportFormat.excel
-          ? await app.admin.exportLogsExcel(logs)
-          : await app.admin.exportLogsPdf(logs);
+      late final Uint8List bytes;
+      if (widget.reportType == _ReportType.attendance) {
+        final logs = snapshot.docs.map(AttendanceLog.fromDoc).toList();
+        bytes = format == _ReportFormat.excel
+            ? await app.admin.exportLogsExcel(logs)
+            : await app.admin.exportLogsPdf(logs);
+      } else {
+        final logs = snapshot.docs.map(GatePassLog.fromDoc).toList();
+        bytes = format == _ReportFormat.excel
+            ? await app.admin.exportGatePassLogsExcel(logs)
+            : await app.admin.exportGatePassLogsPdf(logs);
+      }
       downloadBytes(
         fileName:
-            '${_fileSafeName(schoolYear.name)}-all-attendance-logs.${format.extension}',
+            '${_fileSafeName(schoolYear.name)}-all-${widget.reportType.fileLabel}-logs.${format.extension}',
         bytes: bytes,
         mimeType: format.mimeType,
       );
       await app.audit.record(
-        action: 'attendance_export_${format.extension}',
+        action: '${widget.reportType.auditLabel}_export_${format.extension}',
         actorId: app.currentUser!.id,
         actorName: app.currentUser!.fullName,
         target: schoolYear.name,
-        metadata: {'logCount': logs.length},
+        metadata: {'logCount': snapshot.docs.length},
       );
       messenger.showSnackBar(
         SnackBar(content: Text('${format.label} report downloaded.')),
@@ -304,6 +311,33 @@ class _ReportExportCardState extends State<_ReportExportCard> {
         .replaceAll(RegExp(r'-+'), '-')
         .replaceAll(RegExp(r'^-|-$'), '');
   }
+}
+
+enum _ReportType {
+  attendance(
+    collectionName: 'attendance_logs',
+    emptyLabel: 'attendance',
+    fileLabel: 'attendance',
+    auditLabel: 'attendance',
+  ),
+  gatePass(
+    collectionName: 'gate_pass_logs',
+    emptyLabel: 'gate pass',
+    fileLabel: 'gate-pass',
+    auditLabel: 'gate_pass',
+  );
+
+  const _ReportType({
+    required this.collectionName,
+    required this.emptyLabel,
+    required this.fileLabel,
+    required this.auditLabel,
+  });
+
+  final String collectionName;
+  final String emptyLabel;
+  final String fileLabel;
+  final String auditLabel;
 }
 
 enum _ReportFormat {

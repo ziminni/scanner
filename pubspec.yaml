@@ -44,4 +44,6 @@ flutter:
     - assets/images/
     - assets/img/logo.jpg
     - assets/templates/Students-template.xlsx
-    - assets/templates/Teachers-template.xlsx
+    - assets/templates/Students-template-v2.xlsx
+    - assets/templates/Students-template-v3.xlsx
+    - assets/templates/Teachers-template-v2.xlsx

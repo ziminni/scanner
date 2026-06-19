@@ -34,7 +34,7 @@ class _ImportTeachersDialogState extends State<_ImportTeachersDialog> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Spreadsheet columns: teacher id, last name, first name, middle name, birthdate, address, contact number, time in, time out.',
+                    'Spreadsheet columns: teacher id, last name, first name, middle name, gender, birthdate, address, contact number, time in, time out.',
                   ),
                   const SizedBox(height: 16),
                   SizedBox(

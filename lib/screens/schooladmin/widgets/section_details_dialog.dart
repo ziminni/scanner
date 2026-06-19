@@ -11,6 +11,7 @@ class _SectionDetailsDialog extends StatefulWidget {
 
 class _SectionDetailsDialogState extends State<_SectionDetailsDialog> {
   final _search = TextEditingController();
+  String _genderFilter = '';
 
   @override
   void dispose() {
@@ -53,13 +54,43 @@ class _SectionDetailsDialogState extends State<_SectionDetailsDialog> {
               ),
             ),
             const SizedBox(height: 14),
-            TextField(
-              controller: _search,
-              decoration: const InputDecoration(
-                prefixIcon: Icon(Icons.search),
-                labelText: 'Search students',
-              ),
-              onChanged: (_) => setState(() {}),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final compact = constraints.maxWidth < 520;
+                final searchField = TextField(
+                  controller: _search,
+                  decoration: const InputDecoration(
+                    prefixIcon: Icon(Icons.search),
+                    labelText: 'Search students',
+                  ),
+                  onChanged: (_) => setState(() {}),
+                );
+                final genderFilter = GenderDropdownField(
+                  value: _genderFilter,
+                  includeAll: true,
+                  onChanged: (value) {
+                    setState(() => _genderFilter = value ?? '');
+                  },
+                );
+
+                if (compact) {
+                  return Column(
+                    children: [
+                      searchField,
+                      const SizedBox(height: 10),
+                      genderFilter,
+                    ],
+                  );
+                }
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: searchField),
+                    const SizedBox(width: 12),
+                    SizedBox(width: 180, child: genderFilter),
+                  ],
+                );
+              },
             ),
             const SizedBox(height: 12),
             SizedBox(
@@ -85,10 +116,16 @@ class _SectionDetailsDialogState extends State<_SectionDetailsDialog> {
                           (snapshot.data?.docs ?? [])
                               .map((doc) => doc.data())
                               .where((student) {
-                                if (query.isEmpty) return true;
-                                return _studentDisplayName(
-                                  student,
-                                ).toLowerCase().contains(query);
+                                final gender = _text(student['gender']);
+                                if (_genderFilter.isNotEmpty &&
+                                    gender.toLowerCase() !=
+                                        _genderFilter.toLowerCase()) {
+                                  return false;
+                                }
+                                return query.isEmpty ||
+                                    _studentDisplayName(
+                                      student,
+                                    ).toLowerCase().contains(query);
                               })
                               .toList()
                             ..sort(_studentSort);

@@ -6,6 +6,7 @@ import '../../core/services/app_controller.dart';
 import '../../shared/widgets/admin_widgets.dart';
 import '../../shared/widgets/app_widgets.dart';
 import '../../shared/widgets/form_fields.dart';
+import '../../shared/widgets/gender_dropdown_field.dart';
 import 'viewmodels/crud_viewmodel.dart';
 import 'viewmodels/import_teachers_viewmodel.dart';
 
@@ -22,6 +23,7 @@ class TeachersPage extends StatefulWidget {
     'lastName',
     'firstName',
     'middleName',
+    'gender',
     'birthdate',
     'address',
     'contactNumber',
@@ -37,6 +39,7 @@ class TeachersPage extends StatefulWidget {
 class _TeachersPageState extends State<TeachersPage> {
   final _search = TextEditingController();
   String _scheduleFilter = '';
+  String _genderFilter = '';
 
   @override
   void dispose() {
@@ -61,6 +64,7 @@ class _TeachersPageState extends State<TeachersPage> {
               columns: [
                 'teacherId',
                 'fullName',
+                'gender',
                 'birthdate',
                 'address',
                 'contactNumber',
@@ -92,12 +96,18 @@ class _TeachersPageState extends State<TeachersPage> {
           _TeachersFilterBar(
             search: _search,
             scheduleFilter: _scheduleFilter,
+            genderFilter: _genderFilter,
             onSearchChanged: () => setState(() {}),
             onScheduleChanged: (value) =>
                 setState(() => _scheduleFilter = value),
+            onGenderChanged: (value) => setState(() => _genderFilter = value),
           ),
           const SizedBox(height: 12),
-          _TeachersTable(search: _search.text, scheduleFilter: _scheduleFilter),
+          _TeachersTable(
+            search: _search.text,
+            scheduleFilter: _scheduleFilter,
+            genderFilter: _genderFilter,
+          ),
         ],
       ),
     );
@@ -108,23 +118,27 @@ class _TeachersFilterBar extends StatelessWidget {
   const _TeachersFilterBar({
     required this.search,
     required this.scheduleFilter,
+    required this.genderFilter,
     required this.onSearchChanged,
     required this.onScheduleChanged,
+    required this.onGenderChanged,
   });
 
   final TextEditingController search;
   final String scheduleFilter;
+  final String genderFilter;
   final VoidCallback onSearchChanged;
   final ValueChanged<String> onScheduleChanged;
+  final ValueChanged<String> onGenderChanged;
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final compact = constraints.maxWidth < 560;
+        final compact = constraints.maxWidth < 760;
         final searchWidth = compact
             ? constraints.maxWidth
-            : (constraints.maxWidth - 172).clamp(360.0, 720.0).toDouble();
+            : (constraints.maxWidth - 352).clamp(320.0, 720.0).toDouble();
         return SizedBox(
           width: constraints.maxWidth,
           child: Wrap(
@@ -161,6 +175,14 @@ class _TeachersFilterBar extends StatelessWidget {
                     ),
                   ],
                   onChanged: (value) => onScheduleChanged(value ?? ''),
+                ),
+              ),
+              SizedBox(
+                width: 180,
+                child: GenderDropdownField(
+                  value: genderFilter,
+                  includeAll: true,
+                  onChanged: (value) => onGenderChanged(value ?? ''),
                 ),
               ),
             ],

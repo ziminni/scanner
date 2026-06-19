@@ -47,7 +47,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'System Administrator can create one School Administrator and up to five Staff Scanner accounts.',
+            'Account limits: one System Administrator, three School Administrators, and three Staff Scanner accounts.',
           ),
           if (_message != null)
             Padding(

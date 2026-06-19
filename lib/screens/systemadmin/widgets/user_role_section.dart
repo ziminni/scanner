@@ -16,9 +16,7 @@ class _UserRoleSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final countLabel = isFiltered
-        ? '${users.length} of $totalUsers'
-        : '$totalUsers';
+    final countLabel = '$totalUsers/${role.userLimit}';
 
     return DataSurface(
       child: Column(

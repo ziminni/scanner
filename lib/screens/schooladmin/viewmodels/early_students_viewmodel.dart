@@ -307,7 +307,16 @@ class EarlyStudentsViewModel extends BaseViewModel {
             (doc.data()['gradeLevel'] as String? ?? ''),
     };
 
-    if (selectedRole != PersonRole.student) return {};
+    if (selectedRole == PersonRole.teacher) {
+      final teachersQuery = await _app.repository.activeTeachers(schoolYearId);
+      return {
+        for (final doc in teachersQuery.docs)
+          (doc.data()['teacherId'] as String? ?? doc.id): _PersonFilterData(
+            gender: doc.data()['gender'] as String? ?? '',
+            gradeLevel: '',
+          ),
+      };
+    }
 
     final studentsQuery = await _app.repository.activeStudents(schoolYearId);
     return {

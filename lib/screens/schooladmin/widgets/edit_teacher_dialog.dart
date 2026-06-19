@@ -18,6 +18,7 @@ class _EditTeacherDialog extends StatefulWidget {
 class _EditTeacherDialogState extends State<_EditTeacherDialog> {
   late final Map<String, TextEditingController> _controllers;
   DateTime? _birthdate;
+  String? _selectedGender;
   TimeOfDay? _assignedTimeIn;
   TimeOfDay? _assignedTimeOut;
   bool _saving = false;
@@ -38,6 +39,7 @@ class _EditTeacherDialogState extends State<_EditTeacherDialog> {
         field: TextEditingController(text: widget.data[field] as String? ?? ''),
     };
     _birthdate = _dateFromValue(widget.data['birthdate']);
+    _selectedGender = widget.data['gender'] as String?;
     _assignedTimeIn = _timeFromValue(widget.data['assignedTimeIn']);
     _assignedTimeOut = _timeFromValue(widget.data['assignedTimeOut']);
   }
@@ -76,6 +78,15 @@ class _EditTeacherDialogState extends State<_EditTeacherDialog> {
                 child: BirthdateField(
                   value: _birthdate,
                   onChanged: (date) => setState(() => _birthdate = date),
+                ),
+              ),
+              SizedBox(
+                width: 220,
+                child: GenderDropdownField(
+                  value: _selectedGender,
+                  enabled: !_saving,
+                  onChanged: (gender) =>
+                      setState(() => _selectedGender = gender),
                 ),
               ),
               SizedBox(
@@ -131,6 +142,11 @@ class _EditTeacherDialogState extends State<_EditTeacherDialog> {
   }
 
   Future<void> _save() async {
+    final gender = _selectedGender;
+    if (gender == null) {
+      setState(() => _error = 'Gender is required.');
+      return;
+    }
     setState(() {
       _saving = true;
       _error = null;
@@ -147,6 +163,7 @@ class _EditTeacherDialogState extends State<_EditTeacherDialog> {
             'birthdate': _birthdate == null
                 ? null
                 : Timestamp.fromDate(_birthdate!),
+            'gender': gender,
             'assignedTimeIn': _timeToStorage(
               _assignedTimeIn ?? const TimeOfDay(hour: 7, minute: 0),
             ),

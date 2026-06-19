@@ -8,6 +8,7 @@ import '../../core/utils/section_qr_worker_client.dart';
 import '../../models/models.dart';
 import '../../shared/widgets/admin_widgets.dart';
 import '../../shared/widgets/app_widgets.dart';
+import '../../shared/widgets/gender_dropdown_field.dart';
 import 'viewmodels/crud_viewmodel.dart';
 
 part 'widgets/add_section_dialog.dart';

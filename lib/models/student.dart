@@ -9,6 +9,7 @@ class Student {
     required this.lastName,
     required this.firstName,
     this.middleName = '',
+    this.gender = '',
     this.birthdate,
     this.address = '',
     this.guardianName = '',
@@ -23,6 +24,7 @@ class Student {
   final String lastName;
   final String firstName;
   final String middleName;
+  final String gender;
   final DateTime? birthdate;
   final String address;
   final String guardianName;
@@ -45,6 +47,7 @@ class Student {
       lastName: data['lastName'] as String? ?? '',
       firstName: data['firstName'] as String? ?? '',
       middleName: data['middleName'] as String? ?? '',
+      gender: data['gender'] as String? ?? '',
       birthdate: toDate(data['birthdate']),
       address: data['address'] as String? ?? '',
       guardianName: data['guardianName'] as String? ?? '',
@@ -60,6 +63,7 @@ class Student {
     'lastName': lastName,
     'firstName': firstName,
     'middleName': middleName,
+    'gender': gender,
     'birthdate': fromDate(birthdate),
     'address': address,
     'guardianName': guardianName,

@@ -10,10 +10,11 @@ class StudentsViewModel extends BaseViewModel {
   final AppController _app;
   final controllers = {
     for (final field in studentFields)
-      if (field != 'section' && field != 'status')
+      if (field != 'gender' && field != 'section' && field != 'status')
         field: TextEditingController(),
   };
   String? selectedSection;
+  String? selectedGender;
   DateTime? birthdate;
   String? message;
 
@@ -38,6 +39,11 @@ class StudentsViewModel extends BaseViewModel {
     notifyListeners();
   }
 
+  void selectGender(String? gender) {
+    selectedGender = gender;
+    notifyListeners();
+  }
+
   Future<void> addStudent() async {
     setBusy(true);
     final schoolYear = await _app.attendance.activeSchoolYear();
@@ -50,12 +56,18 @@ class StudentsViewModel extends BaseViewModel {
       setBusy(false);
       return;
     }
+    if (selectedGender == null) {
+      message = 'Gender is required.';
+      setBusy(false);
+      return;
+    }
 
     try {
       final data = {
         for (final entry in controllers.entries)
           entry.key: entry.value.text.trim(),
         'birthdate': birthdate == null ? null : Timestamp.fromDate(birthdate!),
+        'gender': selectedGender,
         'section': selectedSection,
         'status': 'Active',
         'schoolYearId': schoolYear.id,
@@ -89,6 +101,7 @@ const studentFields = [
   'lastName',
   'firstName',
   'middleName',
+  'gender',
   'birthdate',
   'address',
   'guardianName',
@@ -100,6 +113,7 @@ const studentFields = [
 const studentTableFields = [
   'lrn',
   'fullName',
+  'gender',
   'birthdate',
   'address',
   'guardianName',

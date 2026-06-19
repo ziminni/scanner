@@ -15,6 +15,12 @@ enum UserRole {
     UserRole.staffScanner => 'staff_scanner',
   };
 
+  int get userLimit => switch (this) {
+    UserRole.systemAdministrator => 1,
+    UserRole.schoolAdministrator => 3,
+    UserRole.staffScanner => 3,
+  };
+
   static UserRole fromKey(String? value) => UserRole.values.firstWhere(
     (role) => role.key == value,
     orElse: () => UserRole.staffScanner,
@@ -36,6 +42,22 @@ enum PersonRole {
   teacher;
 
   String get label => this == PersonRole.student ? 'Student' : 'Teacher';
+}
+
+enum PersonGender {
+  male,
+  female;
+
+  String get label => this == PersonGender.male ? 'Male' : 'Female';
+
+  static PersonGender? fromValue(String? value) {
+    final normalized = value?.trim().toLowerCase();
+    return switch (normalized) {
+      'male' || 'm' => PersonGender.male,
+      'female' || 'f' => PersonGender.female,
+      _ => null,
+    };
+  }
 }
 
 enum AttendanceType {

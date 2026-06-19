@@ -82,6 +82,12 @@ class _AddTeacherDialogState extends State<_AddTeacherDialog> {
                       padding: const EdgeInsets.only(bottom: 14),
                       child: _fieldInput(entry),
                     ),
+                  GenderDropdownField(
+                    value: _viewModel.selectedGender,
+                    enabled: !_viewModel.busy,
+                    onChanged: _viewModel.setGender,
+                  ),
+                  const SizedBox(height: 14),
                   TimePickerField(
                     label: 'Assigned Time In',
                     value: _viewModel.assignedTimeIn,
@@ -130,7 +136,7 @@ class _AddTeacherDialogState extends State<_AddTeacherDialog> {
                     )
                   : const Icon(Icons.add),
               label: const Text('Add'),
-              onPressed: _viewModel.busy
+              onPressed: _viewModel.busy || _viewModel.selectedGender == null
                   ? null
                   : () async {
                       await _viewModel.addRecord();

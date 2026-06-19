@@ -3,6 +3,17 @@ import 'dart:typed_data';
 
 import 'package:web/web.dart' as web;
 
+void downloadAsset({required String assetPath, required String fileName}) {
+  final assetUrl = Uri.base.resolve('assets/$assetPath').toString();
+  final anchor = web.HTMLAnchorElement()
+    ..href = assetUrl
+    ..download = fileName
+    ..style.display = 'none';
+  web.document.body?.append(anchor);
+  anchor.click();
+  anchor.remove();
+}
+
 void downloadBytes({
   required String fileName,
   required List<int> bytes,
@@ -20,5 +31,8 @@ void downloadBytes({
   web.document.body?.append(anchor);
   anchor.click();
   anchor.remove();
-  web.URL.revokeObjectURL(url);
+  Future<void>.delayed(
+    const Duration(seconds: 1),
+    () => web.URL.revokeObjectURL(url),
+  );
 }

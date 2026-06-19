@@ -50,25 +50,14 @@ class AdminService {
     if (password.length < 6) {
       throw StateError('Password must be at least 6 characters.');
     }
-    if (role == UserRole.schoolAdministrator) {
-      final existing = await _firestore
-          .collection('users')
-          .where('role', isEqualTo: role.key)
-          .where('status', isEqualTo: 'active')
-          .get();
-      if (existing.docs.isNotEmpty) {
-        throw StateError('Only one School Administrator account is allowed.');
-      }
-    }
-    if (role == UserRole.staffScanner) {
-      final existing = await _firestore
-          .collection('users')
-          .where('role', isEqualTo: role.key)
-          .where('status', isEqualTo: 'active')
-          .get();
-      if (existing.docs.length >= 5) {
-        throw StateError('Maximum of five Staff Scanner accounts reached.');
-      }
+    final existing = await _firestore
+        .collection('users')
+        .where('role', isEqualTo: role.key)
+        .get();
+    if (existing.docs.length >= role.userLimit) {
+      throw StateError(
+        'Maximum of ${role.userLimit} ${role.label} accounts reached.',
+      );
     }
 
     final secondaryAppName =
@@ -435,6 +424,7 @@ class AdminService {
                   'Last Name',
                   'First Name',
                   'Middle Name',
+                  'Gender',
                   'Birthdate',
                   'Address',
                   'Guardian',
@@ -447,6 +437,7 @@ class AdminService {
                         student.lastName,
                         student.firstName,
                         student.middleName,
+                        student.gender,
                         _formatDate(student.birthdate),
                         student.address,
                         student.guardianName,
@@ -503,6 +494,7 @@ class AdminService {
                 'Last Name',
                 'First Name',
                 'Middle Name',
+                'Gender',
                 'Birthdate',
                 'Address',
                 'Contact',
@@ -516,6 +508,7 @@ class AdminService {
                       teacher.lastName,
                       teacher.firstName,
                       teacher.middleName,
+                      teacher.gender,
                       _formatDate(teacher.birthdate),
                       teacher.address,
                       teacher.contactNumber,
@@ -541,6 +534,7 @@ class AdminService {
     TextCellValue('Last Name'),
     TextCellValue('First Name'),
     TextCellValue('Middle Name'),
+    TextCellValue('Gender'),
     TextCellValue('Birthdate'),
     TextCellValue('Address'),
     TextCellValue('Guardian Name'),
@@ -552,6 +546,7 @@ class AdminService {
     TextCellValue('Last Name'),
     TextCellValue('First Name'),
     TextCellValue('Middle Name'),
+    TextCellValue('Gender'),
     TextCellValue('Birthdate'),
     TextCellValue('Address'),
     TextCellValue('Contact Number'),
@@ -564,6 +559,7 @@ class AdminService {
     TextCellValue(student.lastName),
     TextCellValue(student.firstName),
     TextCellValue(student.middleName),
+    TextCellValue(student.gender),
     TextCellValue(_formatDate(student.birthdate)),
     TextCellValue(student.address),
     TextCellValue(student.guardianName),
@@ -575,6 +571,7 @@ class AdminService {
     TextCellValue(teacher.lastName),
     TextCellValue(teacher.firstName),
     TextCellValue(teacher.middleName),
+    TextCellValue(teacher.gender),
     TextCellValue(_formatDate(teacher.birthdate)),
     TextCellValue(teacher.address),
     TextCellValue(teacher.contactNumber),
