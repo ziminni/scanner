@@ -23,7 +23,11 @@ class DefaultFirebaseOptions {
       case TargetPlatform.android:
         return android;
       case TargetPlatform.iOS:
-        return ios;
+        throw UnsupportedError(
+          'DefaultFirebaseOptions have not been configured for ios - '
+          'run FlutterFire configure for the leon-garcia Firebase project '
+          'if iOS support is needed.',
+        );
       case TargetPlatform.macOS:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for macos - '
@@ -47,29 +51,20 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyBOgYnYBL6LpY_Bq78SfZ2JA1q74KwykFw',
-    appId: '1:717797446075:web:3c196aacdc0b4e8053749e',
-    messagingSenderId: '717797446075',
-    projectId: 'scanner-4bd39',
-    authDomain: 'scanner-4bd39.firebaseapp.com',
-    storageBucket: 'scanner-4bd39.firebasestorage.app',
-    measurementId: 'G-ZBH8JP19CQ',
+    apiKey: 'AIzaSyA_z2P6t_i8d3yOFpshkNxsoRaJwicu0ww',
+    appId: '1:20326824673:web:1c7250658286f08161d5a0',
+    messagingSenderId: '20326824673',
+    projectId: 'leon-garcia',
+    authDomain: 'leon-garcia.firebaseapp.com',
+    storageBucket: 'leon-garcia.firebasestorage.app',
+    measurementId: 'G-G79DM53QHB',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyClOuAsC987LyI3b1mXqHRVTfG_iZrYi-0',
-    appId: '1:717797446075:android:ea2d5be0edd378df53749e',
-    messagingSenderId: '717797446075',
-    projectId: 'scanner-4bd39',
-    storageBucket: 'scanner-4bd39.firebasestorage.app',
-  );
-
-  static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyAMstQOO6Gpgn1P5zJmYKIXIE1eTtSwRgE',
-    appId: '1:717797446075:ios:0453f8aab42d222253749e',
-    messagingSenderId: '717797446075',
-    projectId: 'scanner-4bd39',
-    storageBucket: 'scanner-4bd39.firebasestorage.app',
-    iosBundleId: 'com.example.scanner',
+    apiKey: 'AIzaSyAQlN6OXZn6UJkysdyQNHSVWydvBC6HdHI',
+    appId: '1:20326824673:android:fb0a11463ef96ab761d5a0',
+    messagingSenderId: '20326824673',
+    projectId: 'leon-garcia',
+    storageBucket: 'leon-garcia.firebasestorage.app',
   );
 }

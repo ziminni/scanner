@@ -1,23 +1,30 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../models/models.dart';
+import '../repositories/firebase_repository.dart';
 import 'admin_service.dart';
 import 'attendance_service.dart';
 import 'audit_service.dart';
 import 'auth_service.dart';
 import 'offline_queue_service.dart';
+import 'sms_notification_service.dart';
 
 class AppController extends ChangeNotifier {
   AppController() {
     audit = AuditService(firestore);
+    sms = SmsNotificationService();
     offlineQueue = OfflineQueueService(Connectivity());
     auth = AuthService(firebaseAuth, firestore, audit);
-    attendance = AttendanceService(firestore, offlineQueue, audit);
+    attendance = AttendanceService(firestore, offlineQueue, audit, sms);
     admin = AdminService(firestore, firebaseAuth, storage, audit);
+    repository = FirebaseRepository(firestore, audit);
   }
 
   final FirebaseFirestore firestore = FirebaseFirestore.instance;
@@ -25,19 +32,23 @@ class AppController extends ChangeNotifier {
   final FirebaseStorage storage = FirebaseStorage.instance;
 
   late final AuditService audit;
+  late final SmsNotificationService sms;
   late final OfflineQueueService offlineQueue;
   late final AuthService auth;
   late final AttendanceService attendance;
   late final AdminService admin;
+  late final FirebaseRepository repository;
 
   AppUser? currentUser;
   bool loading = true;
-  String currentPage = 'dashboard';
   String? authError;
 
   Future<void> initialize() async {
+    await offlineQueue.initialize();
     await offlineQueue.startNetworkWatcher();
-    firebaseAuth.setPersistence(Persistence.LOCAL);
+    if (kIsWeb) {
+      await firebaseAuth.setPersistence(Persistence.LOCAL);
+    }
     firebaseAuth.authStateChanges().listen((_) => refreshUser());
     await refreshUser();
   }
@@ -46,9 +57,6 @@ class AppController extends ChangeNotifier {
     loading = true;
     notifyListeners();
     currentUser = await auth.loadCurrentUser();
-    if (currentUser != null && !auth.canAccess(currentUser!, currentPage)) {
-      currentPage = defaultPageFor(currentUser!);
-    }
     loading = false;
     notifyListeners();
   }
@@ -59,7 +67,6 @@ class AppController extends ChangeNotifier {
     notifyListeners();
     try {
       currentUser = await auth.login(email, password);
-      currentPage = defaultPageFor(currentUser!);
     } catch (error) {
       authError = error.toString();
       rethrow;
@@ -72,26 +79,46 @@ class AppController extends ChangeNotifier {
   Future<void> logout() async {
     await auth.logout();
     currentUser = null;
-    currentPage = 'dashboard';
     notifyListeners();
   }
 
-  void go(String pageId) {
+  Future<AppUser> updateProfile({
+    required String fullName,
+    required String email,
+    required bool sendPasswordReset,
+  }) async {
+    final updated = await auth.updateCurrentUserProfile(
+      fullName: fullName,
+      email: email,
+      sendPasswordReset: sendPasswordReset,
+    );
+    currentUser = updated;
+    notifyListeners();
+    return updated;
+  }
+
+  void logoutForUnauthorizedAccess() {
+    currentUser = null;
+    scheduleMicrotask(notifyListeners);
+    unawaited(auth.logout(reason: 'unauthorized_route'));
+  }
+
+  void recordUnauthorizedAccess(String pageId, String location) {
     final user = currentUser;
     if (user == null) return;
-    if (!auth.canAccess(user, pageId)) {
-      logout();
-      return;
-    }
-    currentPage = pageId;
-    notifyListeners();
-  }
-
-  String defaultPageFor(AppUser user) {
-    return switch (user.role.key) {
-      'staff_scanner' => 'scanner',
-      _ => 'dashboard',
-    };
+    unawaited(
+      audit.record(
+        action: 'unauthorized_access_attempt',
+        actorId: user.id,
+        actorName: user.fullName,
+        target: location,
+        metadata: {
+          'pageId': pageId,
+          'role': user.role.label,
+          'email': user.email,
+        },
+      ),
+    );
   }
 }
 

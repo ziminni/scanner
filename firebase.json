@@ -1,1 +1,79 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"scanner-4bd39","appId":"1:717797446075:android:ea2d5be0edd378df53749e","fileOutput":"android/app/google-services.json"}},"ios":{"default":{"projectId":"scanner-4bd39","appId":"1:717797446075:ios:0453f8aab42d222253749e","uploadDebugSymbols":false,"fileOutput":"ios/Runner/GoogleService-Info.plist"}},"dart":{"lib/firebase_options.dart":{"projectId":"scanner-4bd39","configurations":{"android":"1:717797446075:android:ea2d5be0edd378df53749e","ios":"1:717797446075:ios:0453f8aab42d222253749e","web":"1:717797446075:web:3c196aacdc0b4e8053749e"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "leon-garcia",
+          "appId": "1:20326824673:android:fb0a11463ef96ab761d5a0",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "leon-garcia",
+          "configurations": {
+            "android": "1:20326824673:android:fb0a11463ef96ab761d5a0",
+            "web": "1:20326824673:web:1c7250658286f08161d5a0"
+          }
+        }
+      }
+    }
+  },
+  "hosting": {
+    "public": "build/web",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "headers": [
+      {
+        "source": "/",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      },
+      {
+        "source": "/index.html",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      },
+      {
+        "source": "/flutter_bootstrap.js",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      },
+      {
+        "source": "/flutter_service_worker.js",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      },
+      {
+        "source": "/main.dart.js",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      }
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  }
+}
