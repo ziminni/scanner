@@ -23,7 +23,7 @@ class _SectionCard extends StatelessWidget {
         : gradeLevel.trim().toLowerCase().startsWith('grade')
         ? gradeLevel
         : 'Grade $gradeLevel';
-    final app = AppScope.of(context);
+    final app = SchoolAdminViewModelScope.of(context);
 
     return SizedBox(
       width: 260,
@@ -139,7 +139,7 @@ class _SectionCard extends StatelessWidget {
     Map<String, dynamic> section,
   ) async {
     final messenger = ScaffoldMessenger.of(context);
-    final app = AppScope.of(context);
+    final app = SchoolAdminViewModelScope.of(context);
     final overlay = Overlay.of(context, rootOverlay: true);
     final progress = ValueNotifier(
       const SectionQrExportProgress(current: 0, total: 0),
@@ -150,7 +150,7 @@ class _SectionCard extends StatelessWidget {
     overlay.insert(overlayEntry);
     try {
       await Future<void>.delayed(const Duration(milliseconds: 120));
-      await SectionQrExporter(app).downloadSectionZip(
+      await SectionQrExporter(app.app).downloadSectionZip(
         section,
         onProgress: (value) => progress.value = value,
       );
@@ -210,7 +210,7 @@ class _SectionAdviserLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final app = AppScope.of(context);
+    final app = SchoolAdminViewModelScope.of(context);
     final adviserDocId = (section['adviserDocId'] as String? ?? '').trim();
     if (adviserDocId.isEmpty) {
       return const _CardLine(icon: Icons.person_outline, value: 'No adviser');

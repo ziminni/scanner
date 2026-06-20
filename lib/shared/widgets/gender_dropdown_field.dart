@@ -24,6 +24,7 @@ class GenderDropdownField extends StatelessWidget {
     final selected = includeAll ? (normalized ?? '') : normalized;
     return DropdownButtonFormField<String>(
       initialValue: selected,
+      isExpanded: true,
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: const Icon(Icons.people_outline),
@@ -31,9 +32,15 @@ class GenderDropdownField extends StatelessWidget {
       hint: includeAll ? null : const Text('Select gender'),
       items: [
         if (includeAll)
-          const DropdownMenuItem(value: '', child: Text('All genders')),
+          const DropdownMenuItem(
+            value: '',
+            child: Text('All genders', overflow: TextOverflow.ellipsis),
+          ),
         for (final gender in PersonGender.values)
-          DropdownMenuItem(value: gender.label, child: Text(gender.label)),
+          DropdownMenuItem(
+            value: gender.label,
+            child: Text(gender.label, overflow: TextOverflow.ellipsis),
+          ),
       ],
       onChanged: enabled ? onChanged : null,
     );

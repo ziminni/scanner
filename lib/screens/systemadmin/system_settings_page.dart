@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/services/app_controller.dart';
 import '../../models/models.dart';
-import '../../shared/widgets/admin_widgets.dart';
+import '../../shared/widgets/admin.dart';
 
 class SystemSettingsPage extends StatefulWidget {
   const SystemSettingsPage({super.key});

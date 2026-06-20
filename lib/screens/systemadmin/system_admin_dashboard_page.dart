@@ -7,7 +7,7 @@ import '../../core/constants/enums.dart';
 import '../../core/services/app_controller.dart';
 import '../../models/models.dart';
 import '../../routes/app_routes.dart';
-import '../../shared/widgets/admin_widgets.dart';
+import '../../shared/widgets/admin.dart';
 import '../../shared/widgets/app_widgets.dart';
 import 'audit_logs_page.dart';
 import '../schooladmin/attendance_logs_page.dart';

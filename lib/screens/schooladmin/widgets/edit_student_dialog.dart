@@ -51,7 +51,7 @@ class _EditStudentDialogState extends State<_EditStudentDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final app = AppScope.of(context);
+    final app = SchoolAdminViewModelScope.of(context);
     return AlertDialog(
       title: const Text('Edit student'),
       content: SizedBox(
@@ -175,7 +175,7 @@ class _EditStudentDialogState extends State<_EditStudentDialog> {
       _error = null;
     });
 
-    final app = AppScope.of(context);
+    final app = SchoolAdminViewModelScope.of(context);
     try {
       await app.repository
           .schoolYearCollection(widget.schoolYearId, 'students')

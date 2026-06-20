@@ -203,7 +203,7 @@ class _EditSectionDialogState extends State<_EditSectionDialog> {
   }
 
   Future<void> _save() async {
-    final app = AppScope.of(context);
+    final app = SchoolAdminViewModelScope.of(context);
     final name = _name.text.trim();
     if (name.isEmpty) {
       setState(() => _error = 'Section name is required.');
@@ -273,7 +273,7 @@ class _EditSectionDialogState extends State<_EditSectionDialog> {
   }
 
   Future<void> _deleteSection(String sectionName) async {
-    final app = AppScope.of(context);
+    final app = SchoolAdminViewModelScope.of(context);
     setState(() {
       _deleting = true;
       _error = null;

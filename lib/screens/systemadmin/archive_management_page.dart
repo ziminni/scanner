@@ -7,7 +7,7 @@ import 'package:intl/intl.dart';
 
 import '../../core/services/app_controller.dart';
 import '../../models/models.dart';
-import '../../shared/widgets/admin_widgets.dart';
+import '../../shared/widgets/admin.dart';
 import '../../shared/widgets/app_widgets.dart';
 
 class SystemArchiveManagementPage extends StatefulWidget {

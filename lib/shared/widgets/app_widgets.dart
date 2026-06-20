@@ -102,10 +102,9 @@ class EmptyState extends StatelessWidget {
               Text(
                 subtitle,
                 textAlign: TextAlign.center,
-                style: Theme.of(context)
-                  .textTheme
-                  .bodyMedium
-                  ?.copyWith(color: Theme.of(context).colorScheme.onSurface.withAlpha(179)),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurface.withAlpha(179),
+                ),
               ),
             ],
           ],
@@ -209,7 +208,11 @@ class StatusBadge extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: TextStyle(color: text, fontWeight: FontWeight.w600, fontSize: 12),
+        style: TextStyle(
+          color: text,
+          fontWeight: FontWeight.w600,
+          fontSize: 12,
+        ),
       ),
     );
   }

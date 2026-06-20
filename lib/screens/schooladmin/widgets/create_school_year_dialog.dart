@@ -15,7 +15,9 @@ class _CreateSchoolYearDialogState extends State<CreateSchoolYearDialog> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (_viewModelReady) return;
-    _viewModel = CreateSchoolYearViewModel(AppScope.of(context));
+    _viewModel = CreateSchoolYearViewModel(
+      SchoolAdminViewModelScope.of(context).app,
+    );
     _viewModelReady = true;
   }
 

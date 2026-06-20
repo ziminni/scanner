@@ -16,7 +16,7 @@ class _AddSectionDialogState extends State<_AddSectionDialog> {
     super.didChangeDependencies();
     if (_viewModelReady) return;
     _viewModel = CrudViewModel(
-      app: AppScope.of(context),
+      app: SchoolAdminViewModelScope.of(context).app,
       collection: 'sections',
       fields: SectionsPage._fields,
     );

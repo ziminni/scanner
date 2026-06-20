@@ -111,17 +111,19 @@ class _ScannerAttendanceLogsTable extends StatelessWidget {
         return _ScannerTableSurface(
           child: DataTable(
             columns: const [
+              DataColumn(label: Text('#')),
               DataColumn(label: Text('Name')),
               DataColumn(label: Text('Time In')),
               DataColumn(label: Text('Time Out')),
             ],
             rows: [
-              for (final pair in pairs)
+              for (var index = 0; index < pairs.length; index++)
                 DataRow(
                   cells: [
-                    DataCell(Text(pair.name)),
-                    DataCell(Text(pair.timeIn)),
-                    DataCell(Text(pair.timeOut)),
+                    DataCell(Text('${index + 1}')),
+                    DataCell(Text(pairs[index].name)),
+                    DataCell(Text(pairs[index].timeIn)),
+                    DataCell(Text(pairs[index].timeOut)),
                   ],
                 ),
             ],
@@ -181,19 +183,23 @@ class _ScannerGatePassLogsTable extends StatelessWidget {
         return _ScannerTableSurface(
           child: DataTable(
             columns: const [
+              DataColumn(label: Text('#')),
               DataColumn(label: Text('Name')),
               DataColumn(label: Text('Time Out')),
               DataColumn(label: Text('Time In')),
             ],
             rows: [
-              for (final log in logs)
+              for (var index = 0; index < logs.length; index++)
                 DataRow(
                   cells: [
-                    DataCell(Text(log.fullName)),
-                    DataCell(Text(log.exitTimeText)),
+                    DataCell(Text('${index + 1}')),
+                    DataCell(Text(logs[index].fullName)),
+                    DataCell(Text(logs[index].exitTimeText)),
                     DataCell(
                       Text(
-                        log.returnTimeText.isEmpty ? '-' : log.returnTimeText,
+                        logs[index].returnTimeText.isEmpty
+                            ? '-'
+                            : logs[index].returnTimeText,
                       ),
                     ),
                   ],

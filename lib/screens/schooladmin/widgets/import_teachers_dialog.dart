@@ -15,7 +15,9 @@ class _ImportTeachersDialogState extends State<_ImportTeachersDialog> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (_viewModelReady) return;
-    _viewModel = ImportTeachersViewModel(AppScope.of(context));
+    _viewModel = ImportTeachersViewModel(
+      SchoolAdminViewModelScope.of(context).app,
+    );
     _viewModelReady = true;
   }
 

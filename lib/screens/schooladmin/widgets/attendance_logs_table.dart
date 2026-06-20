@@ -49,7 +49,7 @@ class _AttendanceLogsTableState extends State<AttendanceLogsTable> {
 
   @override
   Widget build(BuildContext context) {
-    final app = AppScope.of(context);
+    final app = SchoolAdminViewModelScope.of(context);
     if (widget.teacherScheduleFilter.isNotEmpty) {
       return FutureBuilder<SchoolYear?>(
         future: app.attendance.activeSchoolYear(),
@@ -77,7 +77,7 @@ class _AttendanceLogsTableState extends State<AttendanceLogsTable> {
 
   Widget _buildLogs(
     BuildContext context,
-    AppController app,
+    SchoolAdminViewModel app,
     Map<String, String> teacherSchedules,
   ) {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
@@ -134,6 +134,7 @@ class _AttendanceLogsTableState extends State<AttendanceLogsTable> {
               FullWidthHorizontalTable(
                 child: DataTable(
                   columns: const [
+                    DataColumn(label: Text('#')),
                     DataColumn(label: Text('ID')),
                     DataColumn(label: Text('Name')),
                     DataColumn(label: Text('Role')),
@@ -145,26 +146,35 @@ class _AttendanceLogsTableState extends State<AttendanceLogsTable> {
                     DataColumn(label: Text('Sync')),
                   ],
                   rows: [
-                    for (final log in paginatedLogs)
+                    for (var index = 0; index < paginatedLogs.length; index++)
                       DataRow(
                         cells: [
-                          DataCell(Text(log.personId)),
-                          DataCell(Text(log.fullName)),
-                          DataCell(Text(log.personRole.label)),
-                          DataCell(Text(log.section)),
-                          DataCell(Text('${log.dateKey} ${log.timeText}')),
-                          DataCell(Text(log.attendanceType.label)),
+                          DataCell(Text('${start + index + 1}')),
+                          DataCell(Text(paginatedLogs[index].personId)),
+                          DataCell(Text(paginatedLogs[index].fullName)),
+                          DataCell(Text(paginatedLogs[index].personRole.label)),
+                          DataCell(Text(paginatedLogs[index].section)),
+                          DataCell(
+                            Text(
+                              '${paginatedLogs[index].dateKey} ${paginatedLogs[index].timeText}',
+                            ),
+                          ),
+                          DataCell(
+                            Text(paginatedLogs[index].attendanceType.label),
+                          ),
                           DataCell(
                             StatusBadge(
-                              label: log.attendanceStatus.label,
+                              label:
+                                  paginatedLogs[index].attendanceStatus.label,
                               type:
-                                  log.attendanceStatus == AttendanceStatus.late
+                                  paginatedLogs[index].attendanceStatus ==
+                                      AttendanceStatus.late
                                   ? 'late'
                                   : 'active',
                             ),
                           ),
-                          DataCell(Text(log.scannedBy)),
-                          DataCell(Text(log.syncStatus.label)),
+                          DataCell(Text(paginatedLogs[index].scannedBy)),
+                          DataCell(Text(paginatedLogs[index].syncStatus.label)),
                         ],
                       ),
                   ],
@@ -230,7 +240,7 @@ class GatePassLogsTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final app = AppScope.of(context);
+    final app = SchoolAdminViewModelScope.of(context);
     if (teacherScheduleFilter.isNotEmpty) {
       return FutureBuilder<SchoolYear?>(
         future: app.attendance.activeSchoolYear(),
@@ -258,7 +268,7 @@ class GatePassLogsTable extends StatelessWidget {
 
   Widget _buildLogs(
     BuildContext context,
-    AppController app,
+    SchoolAdminViewModel app,
     Map<String, String> teacherSchedules,
   ) {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
@@ -293,6 +303,7 @@ class GatePassLogsTable extends StatelessWidget {
           child: FullWidthHorizontalTable(
             child: DataTable(
               columns: const [
+                DataColumn(label: Text('#')),
                 DataColumn(label: Text('ID')),
                 DataColumn(label: Text('Name')),
                 DataColumn(label: Text('Role')),
@@ -307,25 +318,38 @@ class GatePassLogsTable extends StatelessWidget {
                 DataColumn(label: Text('Sync')),
               ],
               rows: [
-                for (final log in logs)
+                for (var index = 0; index < logs.length; index++)
                   DataRow(
                     cells: [
-                      DataCell(Text(log.personId)),
-                      DataCell(Text(log.fullName)),
-                      DataCell(Text(log.personRole.label)),
-                      DataCell(Text(log.section)),
-                      DataCell(Text('${log.dateKey} ${log.exitTimeText}')),
+                      DataCell(Text('${index + 1}')),
+                      DataCell(Text(logs[index].personId)),
+                      DataCell(Text(logs[index].fullName)),
+                      DataCell(Text(logs[index].personRole.label)),
+                      DataCell(Text(logs[index].section)),
                       DataCell(
                         Text(
-                          log.returnTimeText.isEmpty ? '-' : log.returnTimeText,
+                          '${logs[index].dateKey} ${logs[index].exitTimeText}',
                         ),
                       ),
-                      DataCell(Text(log.status.label)),
-                      DataCell(SizedBox(width: 240, child: Text(log.reason))),
-                      DataCell(Text(log.teacherBusinessType?.label ?? '-')),
-                      DataCell(Text(_durationText(log.durationMinutes))),
-                      DataCell(Text(log.scannedBy)),
-                      DataCell(Text(log.syncStatus.label)),
+                      DataCell(
+                        Text(
+                          logs[index].returnTimeText.isEmpty
+                              ? '-'
+                              : logs[index].returnTimeText,
+                        ),
+                      ),
+                      DataCell(Text(logs[index].status.label)),
+                      DataCell(
+                        SizedBox(width: 240, child: Text(logs[index].reason)),
+                      ),
+                      DataCell(
+                        Text(logs[index].teacherBusinessType?.label ?? '-'),
+                      ),
+                      DataCell(
+                        Text(_durationText(logs[index].durationMinutes)),
+                      ),
+                      DataCell(Text(logs[index].scannedBy)),
+                      DataCell(Text(logs[index].syncStatus.label)),
                     ],
                   ),
               ],

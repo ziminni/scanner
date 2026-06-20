@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/services/app_controller.dart';
-import '../../shared/widgets/admin_widgets.dart';
+import '../../shared/widgets/admin.dart';
 
 class DatabaseManagementPage extends StatelessWidget {
   const DatabaseManagementPage({super.key});

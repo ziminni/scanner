@@ -53,15 +53,21 @@ class AppTheme {
       navigationRailTheme: NavigationRailThemeData(
         backgroundColor: AppColors.dark,
         selectedIconTheme: const IconThemeData(color: Colors.white),
-        unselectedIconTheme: IconThemeData(color: AppColors.mint.withAlpha(204)),
+        unselectedIconTheme: IconThemeData(
+          color: AppColors.mint.withAlpha(204),
+        ),
         selectedLabelTextStyle: const TextStyle(color: Colors.white),
-        unselectedLabelTextStyle: TextStyle(color: AppColors.mint.withAlpha(230)),
+        unselectedLabelTextStyle: TextStyle(
+          color: AppColors.mint.withAlpha(230),
+        ),
         elevation: 0,
       ),
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: AppColors.dark,
         indicatorColor: AppColors.primary.withAlpha(31),
-        labelTextStyle: WidgetStateProperty.all(TextStyle(color: AppColors.mint)),
+        labelTextStyle: WidgetStateProperty.all(
+          TextStyle(color: AppColors.mint),
+        ),
       ),
       dataTableTheme: DataTableThemeData(
         headingRowColor: WidgetStateProperty.all(Colors.transparent),
@@ -141,9 +147,7 @@ class AppTheme {
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.adminAccent,
-          side: BorderSide(
-            color: AppColors.adminAccent.withAlpha(140),
-          ),
+          side: BorderSide(color: AppColors.adminAccent.withAlpha(140)),
           textStyle: const TextStyle(fontWeight: FontWeight.w700),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
@@ -160,15 +164,11 @@ class AppTheme {
         ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(
-            color: AppColors.adminAccent.withAlpha(56),
-          ),
+          borderSide: BorderSide(color: AppColors.adminAccent.withAlpha(56)),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(
-            color: AppColors.adminAccent.withAlpha(56),
-          ),
+          borderSide: BorderSide(color: AppColors.adminAccent.withAlpha(56)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
@@ -189,9 +189,7 @@ class AppTheme {
           fontSize: 13,
           fontWeight: FontWeight.w400,
         ),
-        headingRowColor: WidgetStatePropertyAll(
-          AppColors.adminBackground,
-        ),
+        headingRowColor: WidgetStatePropertyAll(AppColors.adminBackground),
         dividerThickness: 0.8,
         dataRowMinHeight: 56,
         dataRowMaxHeight: 76,

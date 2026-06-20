@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../shared/widgets/admin_widgets.dart';
+import '../../shared/widgets/admin.dart';
 import 'attendance_logs_page.dart';
 
 class ScannerUsersPage extends StatelessWidget {

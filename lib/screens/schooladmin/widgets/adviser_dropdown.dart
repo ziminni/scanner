@@ -8,7 +8,7 @@ class _AdviserDropdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final app = AppScope.of(context);
+    final app = SchoolAdminViewModelScope.of(context);
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: (() async* {
         final schoolYear = await app.attendance.activeSchoolYear();

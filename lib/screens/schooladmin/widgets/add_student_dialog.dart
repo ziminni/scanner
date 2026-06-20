@@ -15,7 +15,7 @@ class _AddStudentDialogState extends State<_AddStudentDialog> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (_viewModelReady) return;
-    _viewModel = StudentsViewModel(AppScope.of(context));
+    _viewModel = StudentsViewModel(SchoolAdminViewModelScope.of(context).app);
     _viewModelReady = true;
   }
 

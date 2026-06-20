@@ -7,7 +7,7 @@ class _SectionsByGrade extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final app = AppScope.of(context);
+    final app = SchoolAdminViewModelScope.of(context);
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: app.repository.activeSectionsStream(),
       builder: (context, snapshot) {
@@ -112,7 +112,7 @@ class _SectionsByGrade extends StatelessWidget {
     String sectionDocId,
     Map<String, dynamic> section,
   ) async {
-    final app = AppScope.of(context);
+    final app = SchoolAdminViewModelScope.of(context);
     final sectionName = (section['name'] as String? ?? '').trim();
     if (sectionName.isEmpty) return;
 

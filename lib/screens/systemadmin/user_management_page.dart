@@ -6,7 +6,7 @@ import '../../core/services/app_controller.dart';
 import '../../core/constants/enums.dart';
 import '../../models/models.dart';
 import '../../shared/widgets/app_widgets.dart';
-import '../../shared/widgets/admin_widgets.dart';
+import '../../shared/widgets/admin.dart';
 
 part 'widgets/add_user_dialog.dart';
 part 'widgets/user_card.dart';

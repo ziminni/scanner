@@ -21,7 +21,7 @@ class _SectionDetailsDialogState extends State<_SectionDetailsDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final app = AppScope.of(context);
+    final app = SchoolAdminViewModelScope.of(context);
     final sectionName = widget.section['name'] as String? ?? '';
     final gradeLevel = widget.section['gradeLevel'] as String? ?? '';
 
@@ -191,7 +191,7 @@ class _SectionDetailsAdviserMetric extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final app = AppScope.of(context);
+    final app = SchoolAdminViewModelScope.of(context);
     final adviserDocId = (section['adviserDocId'] as String? ?? '').trim();
     if (adviserDocId.isEmpty) {
       return const _DetailMetric(label: 'Adviser', value: 'No adviser');

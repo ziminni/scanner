@@ -20,6 +20,7 @@ import '../screens/schooladmin/school_year_page.dart';
 import '../screens/schooladmin/sections_page.dart';
 import '../screens/schooladmin/students_page.dart';
 import '../screens/schooladmin/teachers_page.dart';
+import '../screens/schooladmin/viewmodels/school_admin_viewmodel.dart';
 import '../screens/systemadmin/archive_management_page.dart';
 import '../screens/systemadmin/audit_logs_page.dart';
 import '../screens/systemadmin/database_management_page.dart';
@@ -264,12 +265,17 @@ class AppRoutes {
       name: name,
       pageBuilder: (context, state) {
         final page = builder(context);
+        final content = _requiresActiveSchoolYear(pageId)
+            ? ActiveSchoolYearGate(child: page)
+            : page;
+        final app = AppScope.of(context);
         return NoTransitionPage(
           child: AppShell(
             currentPage: pageId,
-            child: _requiresActiveSchoolYear(pageId)
-                ? ActiveSchoolYearGate(child: page)
-                : page,
+            child: SchoolAdminViewModelScope(
+              viewModel: SchoolAdminViewModel(app),
+              child: content,
+            ),
           ),
         );
       },

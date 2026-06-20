@@ -152,7 +152,7 @@ class _EditTeacherDialogState extends State<_EditTeacherDialog> {
       _error = null;
     });
 
-    final app = AppScope.of(context);
+    final app = SchoolAdminViewModelScope.of(context);
     try {
       await app.repository
           .schoolYearCollection(widget.schoolYearId, 'teachers')

@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 
-import '../../core/services/app_controller.dart';
-import '../../shared/widgets/admin_widgets.dart';
+import '../../shared/widgets/admin.dart';
 import '../../shared/widgets/app_widgets.dart';
 import '../../shared/widgets/loading_widget.dart';
 import 'viewmodels/attendance_status_viewmodel.dart';
 import '../../core/constants/enums.dart';
+import 'viewmodels/school_admin_viewmodel.dart';
+
+part 'widgets/status_filter_select.dart';
 
 part 'widgets/attendance_status_table.dart';
 
@@ -24,7 +26,9 @@ class _AttendanceStatusPageState extends State<AttendanceStatusPage> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (_viewModelReady) return;
-    _viewModel = AttendanceStatusViewModel(AppScope.of(context));
+    _viewModel = AttendanceStatusViewModel(
+      SchoolAdminViewModelScope.of(context).app,
+    );
     _viewModelReady = true;
     _viewModel.load();
   }
@@ -147,38 +151,6 @@ class _AttendanceStatusPageState extends State<AttendanceStatusPage> {
           ),
         );
       },
-    );
-  }
-}
-
-class _StatusFilterSelect extends StatelessWidget {
-  const _StatusFilterSelect({
-    required this.label,
-    required this.value,
-    required this.options,
-    required this.onChanged,
-  });
-
-  final String label;
-  final String value;
-  final List<String> options;
-  final ValueChanged<String> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final displayValue = value.isEmpty || options.contains(value) ? value : '';
-    return SizedBox(
-      width: 170,
-      child: DropdownButtonFormField<String>(
-        initialValue: displayValue,
-        decoration: InputDecoration(labelText: label),
-        items: [
-          const DropdownMenuItem(value: '', child: Text('All')),
-          for (final option in options)
-            DropdownMenuItem(value: option, child: Text(option)),
-        ],
-        onChanged: (next) => onChanged(next ?? ''),
-      ),
     );
   }
 }

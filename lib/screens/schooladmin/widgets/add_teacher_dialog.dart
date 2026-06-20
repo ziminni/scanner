@@ -16,7 +16,7 @@ class _AddTeacherDialogState extends State<_AddTeacherDialog> {
     super.didChangeDependencies();
     if (_viewModelReady) return;
     _viewModel = CrudViewModel(
-      app: AppScope.of(context),
+      app: SchoolAdminViewModelScope.of(context).app,
       collection: 'teachers',
       fields: TeachersPage.fields,
     );

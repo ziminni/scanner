@@ -20,6 +20,7 @@ class _TeachersTableState extends State<_TeachersTable> {
 
   int _currentPage = 0;
   int _itemsPerPage = 10;
+  final Set<String> _selectedTeacherIds = {};
 
   @override
   void didUpdateWidget(covariant _TeachersTable oldWidget) {
@@ -28,12 +29,13 @@ class _TeachersTableState extends State<_TeachersTable> {
         oldWidget.scheduleFilter != widget.scheduleFilter ||
         oldWidget.genderFilter != widget.genderFilter) {
       _currentPage = 0;
+      _selectedTeacherIds.clear();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final app = AppScope.of(context);
+    final app = SchoolAdminViewModelScope.of(context);
     return FutureBuilder(
       future: app.attendance.activeSchoolYear(),
       builder: (context, schoolYearSnapshot) {
@@ -76,47 +78,122 @@ class _TeachersTableState extends State<_TeachersTable> {
             final start = currentPage * _itemsPerPage;
             final end = (start + _itemsPerPage).clamp(0, docs.length).toInt();
             final paginatedDocs = docs.sublist(start, end);
-
+            final selectedDocs = docs
+                .where((doc) => _selectedTeacherIds.contains(doc.id))
+                .toList();
+            final hasSelection = selectedDocs.isNotEmpty;
             return DataSurface(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  if (hasSelection) ...[
+                    _TeacherBulkArchiveBar(
+                      selectedCount: selectedDocs.length,
+                      onClear: () => setState(_selectedTeacherIds.clear),
+                      onArchive: () => _bulkArchiveTeachers(
+                        context,
+                        app,
+                        schoolYear,
+                        selectedDocs,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                   FullWidthHorizontalTable(
                     child: DataTable(
+                      onSelectAll: (selected) {
+                        setState(() {
+                          if (selected == true) {
+                            _selectedTeacherIds
+                              ..clear()
+                              ..addAll(docs.map((doc) => doc.id));
+                          } else {
+                            _selectedTeacherIds.clear();
+                          }
+                        });
+                      },
                       headingRowHeight: 44,
                       dataRowMinHeight: 52,
                       dataRowMaxHeight: 64,
-                      columns: const [
-                        DataColumn(label: Text('Teacher ID')),
-                        DataColumn(label: Text('Name')),
-                        DataColumn(label: Text('Gender')),
-                        DataColumn(label: Text('Birthdate')),
-                        DataColumn(label: Text('Address')),
-                        DataColumn(label: Text('Contact')),
-                        DataColumn(label: Text('Schedule')),
-                        DataColumn(label: Text('Actions')),
+                      columns: [
+                        const DataColumn(label: Text('#')),
+                        const DataColumn(label: Text('Teacher ID')),
+                        const DataColumn(label: Text('Name')),
+                        const DataColumn(label: Text('Gender')),
+                        const DataColumn(label: Text('Birthdate')),
+                        const DataColumn(label: Text('Address')),
+                        const DataColumn(label: Text('Contact')),
+                        const DataColumn(label: Text('Schedule')),
+                        const DataColumn(label: Text('Actions')),
                       ],
                       rows: [
-                        for (final doc in paginatedDocs)
+                        for (
+                          var index = 0;
+                          index < paginatedDocs.length;
+                          index++
+                        )
                           DataRow(
+                            selected: _selectedTeacherIds.contains(
+                              paginatedDocs[index].id,
+                            ),
+                            onSelectChanged: (selected) {
+                              setState(() {
+                                if (selected == true) {
+                                  _selectedTeacherIds.add(
+                                    paginatedDocs[index].id,
+                                  );
+                                } else {
+                                  _selectedTeacherIds.remove(
+                                    paginatedDocs[index].id,
+                                  );
+                                }
+                              });
+                            },
                             cells: [
+                              DataCell(Text('${start + index + 1}')),
                               DataCell(
-                                Text(doc.data()['teacherId'] as String? ?? '-'),
+                                Text(
+                                  paginatedDocs[index].data()['teacherId']
+                                          as String? ??
+                                      '-',
+                                ),
                               ),
-                              DataCell(Text(_teacherName(doc.data()))),
                               DataCell(
-                                Text(doc.data()['gender'] as String? ?? '-'),
-                              ),
-                              DataCell(Text(_teacherBirthdate(doc.data()))),
-                              DataCell(
-                                Text(doc.data()['address'] as String? ?? '-'),
+                                Text(_teacherName(paginatedDocs[index].data())),
                               ),
                               DataCell(
                                 Text(
-                                  doc.data()['contactNumber'] as String? ?? '-',
+                                  paginatedDocs[index].data()['gender']
+                                          as String? ??
+                                      '-',
                                 ),
                               ),
-                              DataCell(Text(_teacherSchedule(doc.data()))),
+                              DataCell(
+                                Text(
+                                  _teacherBirthdate(
+                                    paginatedDocs[index].data(),
+                                  ),
+                                ),
+                              ),
+                              DataCell(
+                                Text(
+                                  paginatedDocs[index].data()['address']
+                                          as String? ??
+                                      '-',
+                                ),
+                              ),
+                              DataCell(
+                                Text(
+                                  paginatedDocs[index].data()['contactNumber']
+                                          as String? ??
+                                      '-',
+                                ),
+                              ),
+                              DataCell(
+                                Text(
+                                  _teacherSchedule(paginatedDocs[index].data()),
+                                ),
+                              ),
                               DataCell(
                                 Row(
                                   mainAxisSize: MainAxisSize.min,
@@ -128,8 +205,8 @@ class _TeachersTableState extends State<_TeachersTable> {
                                         context: context,
                                         builder: (_) => _EditTeacherDialog(
                                           schoolYearId: schoolYear.id,
-                                          docId: doc.id,
-                                          data: doc.data(),
+                                          docId: paginatedDocs[index].id,
+                                          data: paginatedDocs[index].data(),
                                         ),
                                       ),
                                     ),
@@ -140,33 +217,21 @@ class _TeachersTableState extends State<_TeachersTable> {
                                         final confirmed =
                                             await _confirmArchiveTeacher(
                                               context,
-                                              _teacherName(doc.data()),
+                                              _teacherName(
+                                                paginatedDocs[index].data(),
+                                              ),
                                             );
                                         if (!confirmed || !context.mounted) {
                                           return;
                                         }
-                                        await app.repository
-                                            .schoolYearCollection(
-                                              schoolYear.id,
-                                              'teachers',
-                                            )
-                                            .doc(doc.id)
-                                            .set({
-                                              'archived': true,
-                                              'archivedAt':
-                                                  FieldValue.serverTimestamp(),
-                                            }, SetOptions(merge: true));
-                                        await app.audit.record(
-                                          action: 'teachers_archived',
-                                          actorId: app.currentUser!.id,
-                                          actorName: app.currentUser!.fullName,
-                                          target:
-                                              doc.data()['teacherId']
-                                                  as String? ??
-                                              doc.id,
-                                          metadata: {
-                                            'schoolYear': schoolYear.name,
-                                          },
+                                        await _archiveTeacherDocs(
+                                          app: app,
+                                          schoolYear: schoolYear,
+                                          docs: [paginatedDocs[index]],
+                                          bulk: false,
+                                        );
+                                        _selectedTeacherIds.remove(
+                                          paginatedDocs[index].id,
                                         );
                                       },
                                     ),
@@ -210,6 +275,131 @@ class _TeachersTableState extends State<_TeachersTable> {
           },
         );
       },
+    );
+  }
+
+  Future<void> _bulkArchiveTeachers(
+    BuildContext context,
+    SchoolAdminViewModel app,
+    SchoolYear schoolYear,
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> selectedDocs,
+  ) async {
+    if (selectedDocs.isEmpty) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Archive selected teachers?'),
+        content: Text(
+          'This will archive ${selectedDocs.length} selected teacher ${selectedDocs.length == 1 ? 'record' : 'records'}.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton.icon(
+            icon: const Icon(Icons.archive_outlined),
+            label: const Text('Archive selected'),
+            onPressed: () => Navigator.pop(context, true),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    await _archiveTeacherDocs(
+      app: app,
+      schoolYear: schoolYear,
+      docs: selectedDocs,
+      bulk: true,
+    );
+    if (!context.mounted) return;
+    setState(_selectedTeacherIds.clear);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('${selectedDocs.length} teachers archived.')),
+    );
+  }
+
+  Future<void> _archiveTeacherDocs({
+    required SchoolAdminViewModel app,
+    required SchoolYear schoolYear,
+    required List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+    required bool bulk,
+  }) async {
+    final batch = FirebaseFirestore.instance.batch();
+    for (final doc in docs) {
+      batch.set(doc.reference, {
+        'archived': true,
+        'archivedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    }
+    await batch.commit();
+    await app.audit.record(
+      action: bulk ? 'teachers_bulk_archived' : 'teachers_archived',
+      actorId: app.currentUser!.id,
+      actorName: app.currentUser!.fullName,
+      target: bulk
+          ? '${docs.length} teacher records'
+          : docs.first.data()['teacherId'] as String? ?? docs.first.id,
+      metadata: {
+        'schoolYear': schoolYear.name,
+        if (bulk)
+          'teacherIds': docs
+              .map((doc) => doc.data()['teacherId'] as String? ?? doc.id)
+              .toList(),
+      },
+    );
+  }
+}
+
+class _TeacherBulkArchiveBar extends StatelessWidget {
+  const _TeacherBulkArchiveBar({
+    required this.selectedCount,
+    required this.onClear,
+    required this.onArchive,
+  });
+
+  final int selectedCount;
+  final VoidCallback onClear;
+  final VoidCallback onArchive;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primary.withAlpha(18),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: theme.colorScheme.primary.withAlpha(45)),
+      ),
+      child: Wrap(
+        spacing: 10,
+        runSpacing: 10,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        alignment: WrapAlignment.spaceBetween,
+        children: [
+          Text(
+            '$selectedCount selected',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              TextButton(onPressed: onClear, child: const Text('Clear')),
+              FilledButton.icon(
+                onPressed: onArchive,
+                icon: const Icon(Icons.archive_outlined),
+                label: const Text('Archive selected'),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

@@ -6,10 +6,11 @@ import '../../core/services/app_controller.dart';
 import '../../core/utils/download_file.dart';
 import '../../core/utils/section_qr_worker_client.dart';
 import '../../models/models.dart';
-import '../../shared/widgets/admin_widgets.dart';
+import '../../shared/widgets/admin.dart';
 import '../../shared/widgets/app_widgets.dart';
 import '../../shared/widgets/gender_dropdown_field.dart';
 import 'viewmodels/crud_viewmodel.dart';
+import 'viewmodels/school_admin_viewmodel.dart';
 
 part 'widgets/add_section_dialog.dart';
 part 'widgets/edit_section_dialog.dart';

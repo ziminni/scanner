@@ -4,8 +4,12 @@ import 'package:intl/intl.dart';
 
 import '../../core/services/app_controller.dart';
 import '../../models/models.dart';
-import '../../shared/widgets/admin_widgets.dart';
+import '../../shared/widgets/admin.dart';
 import '../../shared/widgets/app_widgets.dart';
+import 'viewmodels/school_admin_viewmodel.dart';
+
+part 'widgets/completed_school_year_card.dart';
+part 'widgets/archive_stat_tile.dart';
 
 class SchoolArchiveManagementPage extends StatefulWidget {
   const SchoolArchiveManagementPage({super.key});
@@ -21,7 +25,7 @@ class _SchoolArchiveManagementPageState
 
   @override
   Widget build(BuildContext context) {
-    final app = AppScope.of(context);
+    final app = SchoolAdminViewModelScope.of(context);
 
     return AdminPage(
       title: 'Completed School Years',
@@ -35,11 +39,12 @@ class _SchoolArchiveManagementPageState
             return const Center(child: CircularProgressIndicator());
           }
 
-          final schoolYears = (snapshot.data?.docs ?? [])
-              .where(_isCompletedSchoolYear)
-              .map(SchoolYear.fromDoc)
-              .toList()
-            ..sort(_sortSchoolYearsDescending);
+          final schoolYears =
+              (snapshot.data?.docs ?? [])
+                  .where(_isCompletedSchoolYear)
+                  .map(SchoolYear.fromDoc)
+                  .toList()
+                ..sort(_sortSchoolYearsDescending);
 
           if (schoolYears.isEmpty) {
             return const EmptyState(
@@ -84,9 +89,7 @@ class _SchoolArchiveManagementPageState
     );
   }
 
-  bool _isCompletedSchoolYear(
-    QueryDocumentSnapshot<Map<String, dynamic>> doc,
-  ) {
+  bool _isCompletedSchoolYear(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data();
     final status = data['status']?.toString().toLowerCase();
     return data['isActive'] != true &&
@@ -104,7 +107,7 @@ class _SchoolArchiveManagementPageState
   }
 
   Future<void> _confirmDelete(
-    AppController app,
+    SchoolAdminViewModel app,
     SchoolYear schoolYear,
   ) async {
     final confirmed = await showDialog<bool>(
@@ -135,14 +138,14 @@ class _SchoolArchiveManagementPageState
     try {
       await _deleteSchoolYear(app, schoolYear);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${schoolYear.name} deleted.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('${schoolYear.name} deleted.')));
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Delete failed: $error')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Delete failed: $error')));
     } finally {
       if (mounted) {
         setState(() => _deletingIds.remove(schoolYear.id));
@@ -151,7 +154,7 @@ class _SchoolArchiveManagementPageState
   }
 
   Future<void> _deleteSchoolYear(
-    AppController app,
+    SchoolAdminViewModel app,
     SchoolYear schoolYear,
   ) async {
     if (schoolYear.isActive) {
@@ -197,178 +200,6 @@ class _SchoolArchiveManagementPageState
       }
       await batch.commit();
     }
-  }
-}
-
-class _CompletedSchoolYearCard extends StatelessWidget {
-  const _CompletedSchoolYearCard({
-    required this.schoolYear,
-    required this.deleting,
-    required this.onDelete,
-  });
-
-  final SchoolYear schoolYear;
-  final bool deleting;
-  final VoidCallback onDelete;
-
-  @override
-  Widget build(BuildContext context) {
-    final app = AppScope.of(context);
-    final theme = Theme.of(context);
-
-    return DataSurface(
-      child: FutureBuilder<_SchoolYearStats>(
-        future: _SchoolYearStats.load(app, schoolYear.id),
-        builder: (context, snapshot) {
-          final stats = snapshot.data;
-
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          schoolYear.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          _dateRange(schoolYear),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  FilledButton.icon(
-                    icon: deleting
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.delete_outline),
-                    label: const Text('Delete'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.red,
-                      foregroundColor: Colors.white,
-                    ),
-                    onPressed: deleting ? null : onDelete,
-                  ),
-                ],
-              ),
-              const Spacer(),
-              if (snapshot.connectionState == ConnectionState.waiting)
-                const LinearProgressIndicator()
-              else
-                Row(
-                  children: [
-                    Expanded(
-                      child: _StatTile(
-                        label: 'Students',
-                        value: (stats?.students ?? 0).toString(),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _StatTile(
-                        label: 'Teachers',
-                        value: (stats?.teachers ?? 0).toString(),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _StatTile(
-                        label: 'Attendance',
-                        value: (stats?.attendanceLogs ?? 0).toString(),
-                      ),
-                    ),
-                  ],
-                ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
-  String _dateRange(SchoolYear schoolYear) {
-    final start = _firstDate(schoolYear.termStarts);
-    final end = _lastDate(schoolYear.termEnds);
-    if (start == null && end == null) return 'Date range not set';
-
-    final formatter = DateFormat('MMM d, yyyy');
-    final startText = start == null ? 'Not set' : formatter.format(start);
-    final endText = end == null ? 'Not set' : formatter.format(end);
-    return '$startText - $endText';
-  }
-
-  DateTime? _firstDate(List<DateTime?> dates) {
-    for (final date in dates) {
-      if (date != null) return date;
-    }
-    return null;
-  }
-
-  DateTime? _lastDate(List<DateTime?> dates) {
-    for (final date in dates.reversed) {
-      if (date != null) return date;
-    }
-    return null;
-  }
-}
-
-class _StatTile extends StatelessWidget {
-  const _StatTile({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }
 

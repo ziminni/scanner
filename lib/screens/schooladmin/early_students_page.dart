@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/constants/enums.dart';
-import '../../core/services/app_controller.dart';
-import '../../shared/widgets/admin_widgets.dart';
+import '../../shared/widgets/admin.dart';
 import '../../shared/widgets/app_widgets.dart';
 import '../../shared/widgets/loading_widget.dart';
 import 'viewmodels/early_students_viewmodel.dart';
+import 'viewmodels/school_admin_viewmodel.dart';
+
+part 'widgets/early_filter_select.dart';
 
 part 'widgets/period_selector.dart';
 part 'widgets/role_selector.dart';
@@ -29,7 +31,9 @@ class _EarlyStudentsPageState extends State<EarlyStudentsPage> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (_viewModelReady) return;
-    _viewModel = EarlyStudentsViewModel(AppScope.of(context));
+    _viewModel = EarlyStudentsViewModel(
+      SchoolAdminViewModelScope.of(context).app,
+    );
     _viewModelReady = true;
     _viewModel.load();
   }
@@ -130,38 +134,6 @@ class _EarlyStudentsPageState extends State<EarlyStudentsPage> {
           ),
         );
       },
-    );
-  }
-}
-
-class _EarlyFilterSelect extends StatelessWidget {
-  const _EarlyFilterSelect({
-    required this.label,
-    required this.value,
-    required this.options,
-    required this.onChanged,
-  });
-
-  final String label;
-  final String value;
-  final List<String> options;
-  final ValueChanged<String> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final displayValue = value.isEmpty || options.contains(value) ? value : '';
-    return SizedBox(
-      width: 180,
-      child: DropdownButtonFormField<String>(
-        initialValue: displayValue,
-        decoration: InputDecoration(labelText: label),
-        items: [
-          const DropdownMenuItem(value: '', child: Text('All')),
-          for (final option in options)
-            DropdownMenuItem(value: option, child: Text(option)),
-        ],
-        onChanged: (next) => onChanged(next ?? ''),
-      ),
     );
   }
 }
