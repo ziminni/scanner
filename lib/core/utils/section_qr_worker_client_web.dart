@@ -43,6 +43,36 @@ Future<Uint8List> buildSectionQrZipInWorker({
   required List<SectionQrWorkerStudent> students,
   void Function(SectionQrWorkerProgress progress)? onProgress,
 }) {
+  return _buildQrZipInWorker(
+    sectionName: sectionName,
+    gradeSection: gradeSection,
+    people: students,
+    onProgress: onProgress,
+  );
+}
+
+Future<Uint8List> buildTeacherQrZipInWorker({
+  required List<SectionQrWorkerStudent> teachers,
+  void Function(SectionQrWorkerProgress progress)? onProgress,
+}) {
+  return _buildQrZipInWorker(
+    sectionName: 'teachers_qr',
+    gradeSection: 'Teachers',
+    people: teachers,
+    identifierLabel: 'Teacher ID',
+    cardTitle: 'TEMPORARY TEACHER ID',
+    onProgress: onProgress,
+  );
+}
+
+Future<Uint8List> _buildQrZipInWorker({
+  required String sectionName,
+  required String gradeSection,
+  required List<SectionQrWorkerStudent> people,
+  String identifierLabel = 'LRN',
+  String cardTitle = 'TEMPORARY STUDENT ID',
+  void Function(SectionQrWorkerProgress progress)? onProgress,
+}) {
   final completer = Completer<Uint8List>();
   final worker = html.Worker('section_qr_worker.js');
   late final StreamSubscription<html.MessageEvent> subscription;
@@ -98,7 +128,9 @@ Future<Uint8List> buildSectionQrZipInWorker({
   worker.postMessage({
     'sectionName': sectionName,
     'gradeSection': gradeSection,
-    'students': students.map((student) => student.toMap()).toList(),
+    'students': people.map((person) => person.toMap()).toList(),
+    'identifierLabel': identifierLabel,
+    'cardTitle': cardTitle,
   });
   return completer.future;
 }

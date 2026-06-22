@@ -7,6 +7,8 @@ self.onmessage = async (event) => {
   const students = payload.students || [];
   const sectionName = payload.sectionName || 'students_qr';
   const gradeSection = payload.gradeSection || '';
+  const identifierLabel = payload.identifierLabel || 'LRN';
+  const cardTitle = payload.cardTitle || 'TEMPORARY STUDENT ID';
 
   try {
     const files = [];
@@ -19,6 +21,8 @@ self.onmessage = async (event) => {
         lrn: student.lrn || '',
         name: displayName.toUpperCase(),
         gradeSection: gradeSection.toUpperCase(),
+        identifierLabel: identifierLabel.toUpperCase(),
+        cardTitle: cardTitle.toUpperCase(),
       });
       files.push({
         name: `${safeFileName(`${student.lastName || ''} ${student.firstName || ''}`)}.png`,
@@ -38,7 +42,7 @@ self.onmessage = async (event) => {
   }
 };
 
-async function temporaryIdPng({ lrn, name, gradeSection }) {
+async function temporaryIdPng({ lrn, name, gradeSection, identifierLabel, cardTitle }) {
   const qr = qrcode(0, 'M');
   qr.addData(lrn);
   qr.make();
@@ -69,7 +73,7 @@ async function temporaryIdPng({ lrn, name, gradeSection }) {
   context.fillStyle = '#ffffff';
   context.font = '700 24px Arial, Helvetica, sans-serif';
   context.textBaseline = 'alphabetic';
-  context.fillText('TEMPORARY STUDENT ID', 40, 47);
+  context.fillText(cardTitle, 40, 47);
 
   context.fillStyle = '#ffffff';
   context.fillRect(qrLeft, qrTop, qrSize, qrSize);
@@ -95,7 +99,7 @@ async function temporaryIdPng({ lrn, name, gradeSection }) {
   drawTextToFit(context, gradeSection, 74, 742, 570, 24);
 
   context.font = '24px Arial, Helvetica, sans-serif';
-  drawTextToFit(context, `LRN: ${lrn}`, 74, 796, 570, 24);
+  drawTextToFit(context, `${identifierLabel}: ${lrn}`, 74, 796, 570, 24);
 
   context.fillStyle = '#0f7d4d';
   context.font = '700 24px Arial, Helvetica, sans-serif';

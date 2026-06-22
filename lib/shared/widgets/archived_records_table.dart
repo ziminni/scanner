@@ -42,21 +42,27 @@ class ArchivedRecordsTableState extends State<ArchivedRecordsTable> {
           );
         }
 
-        final docs = [...snapshot.data?.docs ?? []]
-          ..sort((a, b) {
-            final aTime = a.data()['archivedAt'];
-            final bTime = b.data()['archivedAt'];
-            if (aTime is Timestamp && bTime is Timestamp) {
-              return bTime.toDate().compareTo(aTime.toDate());
-            }
-            return 0;
-          });
+        final List<QueryDocumentSnapshot<Map<String, dynamic>>> docs =
+            [
+              ...(snapshot.data?.docs ??
+                  <QueryDocumentSnapshot<Map<String, dynamic>>>[]),
+            ]..sort((a, b) {
+              final aTime = a.data()['archivedAt'];
+              final bTime = b.data()['archivedAt'];
+              if (aTime is Timestamp && bTime is Timestamp) {
+                return bTime.toDate().compareTo(aTime.toDate());
+              }
+              return 0;
+            });
         _selectedArchiveIds.removeWhere(
           (id) => docs.every((doc) => doc.id != id),
         );
         final selectedCount = docs
             .where((doc) => _selectedArchiveIds.contains(doc.id))
             .length;
+        final selectedDocs = docs
+            .where((doc) => _selectedArchiveIds.contains(doc.id))
+            .toList();
 
         if (docs.isEmpty) {
           return SizedBox(
@@ -75,6 +81,10 @@ class ArchivedRecordsTableState extends State<ArchivedRecordsTable> {
                   ArchiveSelectionBar(
                     selectedCount: selectedCount,
                     onClear: () => setState(_selectedArchiveIds.clear),
+                    onRestore: () =>
+                        _restoreSelectedRecords(context, selectedDocs),
+                    onDelete: () =>
+                        _deleteSelectedRecords(context, selectedDocs),
                   ),
                   const SizedBox(height: 12),
                 ],
@@ -104,7 +114,6 @@ class ArchivedRecordsTableState extends State<ArchivedRecordsTable> {
                                 : adminLabel(column),
                           ),
                         ),
-                      const DataColumn(label: Text('Actions')),
                     ],
                     rows: [
                       for (var index = 0; index < docs.length; index++)
@@ -133,34 +142,6 @@ class ArchivedRecordsTableState extends State<ArchivedRecordsTable> {
                                         ),
                                 ),
                               ),
-                            DataCell(
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  IconButton(
-                                    tooltip: 'Restore',
-                                    icon: const Icon(Icons.restore_outlined),
-                                    onPressed: () => _restoreArchivedRecord(
-                                      context,
-                                      docs[index],
-                                    ),
-                                  ),
-                                  IconButton(
-                                    tooltip: 'Delete permanently',
-                                    icon: Icon(
-                                      Icons.delete_outline,
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.error,
-                                    ),
-                                    onPressed: () => _deleteArchivedRecord(
-                                      context,
-                                      docs[index],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
                           ],
                         ),
                     ],
@@ -174,16 +155,17 @@ class ArchivedRecordsTableState extends State<ArchivedRecordsTable> {
     );
   }
 
-  Future<void> _restoreArchivedRecord(
+  Future<void> _restoreSelectedRecords(
     BuildContext context,
-    QueryDocumentSnapshot<Map<String, dynamic>> doc,
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
   ) async {
-    final title = _recordTitle(doc);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Restore archived record?'),
-        content: Text('Restore $title to the active records?'),
+        title: const Text('Restore selected records?'),
+        content: Text(
+          'Restore ${docs.length} selected ${widget.collection} records to the active list?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -200,17 +182,20 @@ class ArchivedRecordsTableState extends State<ArchivedRecordsTable> {
     if (confirmed != true || !context.mounted) return;
 
     final app = AppScope.of(context);
-    await doc.reference.set({
-      'archived': false,
-      'restoredAt': FieldValue.serverTimestamp(),
-      'archivedAt': FieldValue.delete(),
-    }, SetOptions(merge: true));
+    await _commitInBatches(app, docs, (batch, doc) {
+      batch.set(doc.reference, {
+        'archived': false,
+        'restoredAt': FieldValue.serverTimestamp(),
+        'archivedAt': FieldValue.delete(),
+      }, SetOptions(merge: true));
+    });
     await app.audit.record(
       action: '${widget.collection}_restored',
       actorId: app.currentUser!.id,
       actorName: app.currentUser!.fullName,
-      target: title,
+      target: '${docs.length} ${widget.collection} records',
       metadata: {
+        'recordCount': docs.length,
         if (widget.schoolYearId != null) 'schoolYearId': widget.schoolYearId,
         if (widget.schoolYearName != null) 'schoolYear': widget.schoolYearName,
       },
@@ -218,20 +203,19 @@ class ArchivedRecordsTableState extends State<ArchivedRecordsTable> {
     if (!context.mounted) return;
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(SnackBar(content: Text('$title restored.')));
+    ).showSnackBar(SnackBar(content: Text('${docs.length} records restored.')));
   }
 
-  Future<void> _deleteArchivedRecord(
+  Future<void> _deleteSelectedRecords(
     BuildContext context,
-    QueryDocumentSnapshot<Map<String, dynamic>> doc,
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
   ) async {
-    final title = _recordTitle(doc);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Delete archived record?'),
+        title: const Text('Delete selected records?'),
         content: Text(
-          'This will permanently delete $title from the archive. This cannot be undone.',
+          'This will permanently delete ${docs.length} selected ${widget.collection} records from the archive. This cannot be undone.',
         ),
         actions: [
           TextButton(
@@ -253,31 +237,43 @@ class ArchivedRecordsTableState extends State<ArchivedRecordsTable> {
     if (confirmed != true || !context.mounted) return;
 
     final app = AppScope.of(context);
-    await doc.reference.delete();
+    await _commitInBatches(
+      app,
+      docs,
+      (batch, doc) => batch.delete(doc.reference),
+    );
     await app.audit.record(
       action: '${widget.collection}_deleted_from_archive',
       actorId: app.currentUser!.id,
       actorName: app.currentUser!.fullName,
-      target: title,
+      target: '${docs.length} ${widget.collection} records',
       metadata: {
+        'recordCount': docs.length,
         if (widget.schoolYearId != null) 'schoolYearId': widget.schoolYearId,
         if (widget.schoolYearName != null) 'schoolYear': widget.schoolYearName,
       },
     );
     if (!context.mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('$title permanently deleted.')));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('${docs.length} records permanently deleted.')),
+    );
   }
 
-  String _recordTitle(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
-    final data = doc.data();
-    final name = adminPersonName(data);
-    if (name != '-') return name;
-    for (final key in ['name', 'teacherId', 'lrn', 'title']) {
-      final value = data[key]?.toString().trim() ?? '';
-      if (value.isNotEmpty) return value;
+  Future<void> _commitInBatches(
+    AppController app,
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+    void Function(
+      WriteBatch batch,
+      QueryDocumentSnapshot<Map<String, dynamic>> doc,
+    )
+    write,
+  ) async {
+    for (var start = 0; start < docs.length; start += 450) {
+      final batch = app.firestore.batch();
+      for (final doc in docs.skip(start).take(450)) {
+        write(batch, doc);
+      }
+      await batch.commit();
     }
-    return doc.id;
   }
 }

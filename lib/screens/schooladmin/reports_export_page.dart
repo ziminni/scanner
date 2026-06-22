@@ -3,12 +3,14 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 
 import '../../core/utils/download_file.dart';
+import '../../core/utils/section_qr_worker_client.dart';
 import '../../models/models.dart';
 import '../../shared/widgets/admin.dart';
 import 'viewmodels/school_admin_viewmodel.dart';
 
 part 'widgets/template_download_card.dart';
 part 'widgets/report_export_card.dart';
+part 'widgets/teacher_qr_download_card.dart';
 
 class ReportsExportPage extends StatelessWidget {
   const ReportsExportPage({super.key});
@@ -53,6 +55,7 @@ class ReportsExportPage extends StatelessWidget {
             fileName: 'Teachers-template.xlsx',
             assetPath: 'assets/templates/Teachers-template-v2.xlsx',
           ),
+          _TeacherQrDownloadCard(),
         ],
       ),
     );

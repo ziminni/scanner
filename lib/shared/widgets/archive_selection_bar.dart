@@ -5,10 +5,14 @@ class ArchiveSelectionBar extends StatelessWidget {
     super.key,
     required this.selectedCount,
     required this.onClear,
+    required this.onRestore,
+    required this.onDelete,
   });
 
   final int selectedCount;
   final VoidCallback onClear;
+  final VoidCallback onRestore;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -33,7 +37,27 @@ class ArchiveSelectionBar extends StatelessWidget {
               fontWeight: FontWeight.w700,
             ),
           ),
-          TextButton(onPressed: onClear, child: const Text('Clear')),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              TextButton(onPressed: onClear, child: const Text('Clear')),
+              FilledButton.icon(
+                onPressed: onRestore,
+                icon: const Icon(Icons.restore_outlined),
+                label: const Text('Restore'),
+              ),
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: theme.colorScheme.error,
+                  foregroundColor: theme.colorScheme.onError,
+                ),
+                onPressed: onDelete,
+                icon: const Icon(Icons.delete_outline),
+                label: const Text('Delete'),
+              ),
+            ],
+          ),
         ],
       ),
     );

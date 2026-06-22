@@ -34,3 +34,10 @@ Future<Uint8List> buildSectionQrZipInWorker({
 }) {
   throw UnsupportedError('Student QR ZIP worker is only available on web.');
 }
+
+Future<Uint8List> buildTeacherQrZipInWorker({
+  required List<SectionQrWorkerStudent> teachers,
+  void Function(SectionQrWorkerProgress progress)? onProgress,
+}) {
+  throw UnsupportedError('Teacher QR ZIP worker is only available on web.');
+}
