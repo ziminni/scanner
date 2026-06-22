@@ -121,11 +121,28 @@ class _StudentsPageState extends State<StudentsPage> {
             schoolYearScoped: true,
             confirmArchive: true,
             enableBulkArchive: true,
+            showArchiveAction: false,
+            teacherTableStyle: true,
+            itemLabel: 'students',
+            columnLabels: const {
+              'lrn': 'LRN',
+              'fullName': 'Name',
+              'guardianName': 'Guardian',
+              'guardianContact': 'Guardian Contact',
+            },
             search: _search.text,
             filters: {
               if (_sectionFilter.isNotEmpty) 'section': _sectionFilter,
               if (_genderFilter.isNotEmpty) 'gender': _genderFilter,
             },
+            onRowTap: (context, _, data, _) => showDialog<void>(
+              context: context,
+              builder: (_) => RecordDetailsDialog(
+                title: 'Student Details',
+                data: data,
+                columns: studentTableFields,
+              ),
+            ),
             onEdit: _openEditStudentDialog,
           ),
         ],

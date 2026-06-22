@@ -12,3 +12,4 @@ export 'count_list_item.dart';
 export 'counts_cell.dart';
 export 'data_surface.dart';
 export 'full_width_horizontal_table.dart';
+export 'record_details_dialog.dart';

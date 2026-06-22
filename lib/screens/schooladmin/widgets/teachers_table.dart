@@ -21,6 +21,9 @@ class _TeachersTableState extends State<_TeachersTable> {
   int _currentPage = 0;
   int _itemsPerPage = 10;
   final Set<String> _selectedTeacherIds = {};
+  String? _hoveredTeacherId;
+  Timer? _hoverResumeTimer;
+  bool _hoverPaused = false;
 
   @override
   void didUpdateWidget(covariant _TeachersTable oldWidget) {
@@ -31,6 +34,12 @@ class _TeachersTableState extends State<_TeachersTable> {
       _currentPage = 0;
       _selectedTeacherIds.clear();
     }
+  }
+
+  @override
+  void dispose() {
+    _hoverResumeTimer?.cancel();
+    super.dispose();
   }
 
   @override
@@ -99,148 +108,172 @@ class _TeachersTableState extends State<_TeachersTable> {
                     ),
                     const SizedBox(height: 12),
                   ],
-                  FullWidthHorizontalTable(
-                    child: DataTable(
-                      onSelectAll: (selected) {
-                        setState(() {
-                          if (selected == true) {
-                            _selectedTeacherIds
-                              ..clear()
-                              ..addAll(docs.map((doc) => doc.id));
-                          } else {
-                            _selectedTeacherIds.clear();
-                          }
-                        });
-                      },
-                      headingRowHeight: 44,
-                      dataRowMinHeight: 52,
-                      dataRowMaxHeight: 64,
-                      columns: [
-                        const DataColumn(label: Text('#')),
-                        const DataColumn(label: Text('Teacher ID')),
-                        const DataColumn(label: Text('Name')),
-                        const DataColumn(label: Text('Gender')),
-                        const DataColumn(label: Text('Birthdate')),
-                        const DataColumn(label: Text('Address')),
-                        const DataColumn(label: Text('Contact')),
-                        const DataColumn(label: Text('Schedule')),
-                        const DataColumn(label: Text('Actions')),
-                      ],
-                      rows: [
-                        for (
-                          var index = 0;
-                          index < paginatedDocs.length;
-                          index++
-                        )
-                          DataRow(
-                            selected: _selectedTeacherIds.contains(
-                              paginatedDocs[index].id,
+                  Listener(
+                    onPointerSignal: _pauseHoverForScroll,
+                    child: FullWidthHorizontalTable(
+                      child: DataTable(
+                        headingRowHeight: 44,
+                        dataRowMinHeight: 52,
+                        dataRowMaxHeight: 64,
+                        columns: [
+                          DataColumn(
+                            label: Checkbox(
+                              value: selectedDocs.length == docs.length,
+                              tristate:
+                                  selectedDocs.isNotEmpty &&
+                                  selectedDocs.length < docs.length,
+                              onChanged: (selected) =>
+                                  _setAllSelected(docs, selected == true),
                             ),
-                            onSelectChanged: (selected) {
-                              setState(() {
-                                if (selected == true) {
-                                  _selectedTeacherIds.add(
-                                    paginatedDocs[index].id,
-                                  );
-                                } else {
-                                  _selectedTeacherIds.remove(
-                                    paginatedDocs[index].id,
-                                  );
+                          ),
+                          const DataColumn(label: Text('#')),
+                          const DataColumn(label: Text('Teacher ID')),
+                          const DataColumn(label: Text('Name')),
+                          const DataColumn(label: Text('Gender')),
+                          const DataColumn(label: Text('Birthdate')),
+                          const DataColumn(label: Text('Address')),
+                          const DataColumn(label: Text('Contact')),
+                          const DataColumn(label: Text('Schedule')),
+                          const DataColumn(label: Text('Actions')),
+                        ],
+                        rows: [
+                          for (
+                            var index = 0;
+                            index < paginatedDocs.length;
+                            index++
+                          )
+                            DataRow(
+                              color: WidgetStateProperty.resolveWith((states) {
+                                final colorScheme = Theme.of(
+                                  context,
+                                ).colorScheme;
+                                if (_hoveredTeacherId ==
+                                    paginatedDocs[index].id) {
+                                  return colorScheme.primary.withAlpha(20);
                                 }
-                              });
-                            },
-                            cells: [
-                              DataCell(Text('${start + index + 1}')),
-                              DataCell(
-                                Text(
-                                  paginatedDocs[index].data()['teacherId']
-                                          as String? ??
-                                      '-',
-                                ),
+                                if (states.contains(WidgetState.selected)) {
+                                  return colorScheme.primary.withAlpha(12);
+                                }
+                                return null;
+                              }),
+                              selected: _selectedTeacherIds.contains(
+                                paginatedDocs[index].id,
                               ),
-                              DataCell(
-                                Text(_teacherName(paginatedDocs[index].data())),
-                              ),
-                              DataCell(
-                                Text(
-                                  paginatedDocs[index].data()['gender']
-                                          as String? ??
-                                      '-',
-                                ),
-                              ),
-                              DataCell(
-                                Text(
-                                  _teacherBirthdate(
-                                    paginatedDocs[index].data(),
+                              cells: [
+                                DataCell(
+                                  Checkbox(
+                                    value: _selectedTeacherIds.contains(
+                                      paginatedDocs[index].id,
+                                    ),
+                                    onChanged: (selected) =>
+                                        _setTeacherSelected(
+                                          paginatedDocs[index].id,
+                                          selected == true,
+                                        ),
                                   ),
                                 ),
-                              ),
-                              DataCell(
-                                Text(
-                                  paginatedDocs[index].data()['address']
-                                          as String? ??
-                                      '-',
+                                _detailsCell(
+                                  context,
+                                  paginatedDocs[index].id,
+                                  paginatedDocs[index].data(),
+                                  Text('${start + index + 1}'),
                                 ),
-                              ),
-                              DataCell(
-                                Text(
-                                  paginatedDocs[index].data()['contactNumber']
-                                          as String? ??
-                                      '-',
+                                _detailsCell(
+                                  context,
+                                  paginatedDocs[index].id,
+                                  paginatedDocs[index].data(),
+                                  Text(
+                                    paginatedDocs[index].data()['teacherId']
+                                            as String? ??
+                                        '-',
+                                  ),
                                 ),
-                              ),
-                              DataCell(
-                                Text(
-                                  _teacherSchedule(paginatedDocs[index].data()),
+                                _detailsCell(
+                                  context,
+                                  paginatedDocs[index].id,
+                                  paginatedDocs[index].data(),
+                                  Text(
+                                    _teacherName(paginatedDocs[index].data()),
+                                  ),
                                 ),
-                              ),
-                              DataCell(
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    IconButton(
-                                      tooltip: 'Edit',
-                                      icon: const Icon(Icons.edit_outlined),
-                                      onPressed: () => showDialog<void>(
-                                        context: context,
-                                        builder: (_) => _EditTeacherDialog(
-                                          schoolYearId: schoolYear.id,
-                                          docId: paginatedDocs[index].id,
-                                          data: paginatedDocs[index].data(),
+                                _detailsCell(
+                                  context,
+                                  paginatedDocs[index].id,
+                                  paginatedDocs[index].data(),
+                                  Text(
+                                    paginatedDocs[index].data()['gender']
+                                            as String? ??
+                                        '-',
+                                  ),
+                                ),
+                                _detailsCell(
+                                  context,
+                                  paginatedDocs[index].id,
+                                  paginatedDocs[index].data(),
+                                  Text(
+                                    _teacherBirthdate(
+                                      paginatedDocs[index].data(),
+                                    ),
+                                  ),
+                                ),
+                                _detailsCell(
+                                  context,
+                                  paginatedDocs[index].id,
+                                  paginatedDocs[index].data(),
+                                  SizedBox(
+                                    width: 105,
+                                    child: Text(
+                                      paginatedDocs[index].data()['address']
+                                              as String? ??
+                                          '-',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ),
+                                _detailsCell(
+                                  context,
+                                  paginatedDocs[index].id,
+                                  paginatedDocs[index].data(),
+                                  Text(
+                                    paginatedDocs[index].data()['contactNumber']
+                                            as String? ??
+                                        '-',
+                                  ),
+                                ),
+                                _detailsCell(
+                                  context,
+                                  paginatedDocs[index].id,
+                                  paginatedDocs[index].data(),
+                                  Text(
+                                    _teacherSchedule(
+                                      paginatedDocs[index].data(),
+                                    ),
+                                  ),
+                                ),
+                                DataCell(
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      IconButton(
+                                        tooltip: 'Edit',
+                                        icon: const Icon(Icons.edit_outlined),
+                                        onPressed: () => showDialog<void>(
+                                          context: context,
+                                          builder: (_) => _EditTeacherDialog(
+                                            schoolYearId: schoolYear.id,
+                                            docId: paginatedDocs[index].id,
+                                            data: paginatedDocs[index].data(),
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                    IconButton(
-                                      tooltip: 'Archive',
-                                      icon: const Icon(Icons.archive_outlined),
-                                      onPressed: () async {
-                                        final confirmed =
-                                            await _confirmArchiveTeacher(
-                                              context,
-                                              _teacherName(
-                                                paginatedDocs[index].data(),
-                                              ),
-                                            );
-                                        if (!confirmed || !context.mounted) {
-                                          return;
-                                        }
-                                        await _archiveTeacherDocs(
-                                          app: app,
-                                          schoolYear: schoolYear,
-                                          docs: [paginatedDocs[index]],
-                                          bulk: false,
-                                        );
-                                        _selectedTeacherIds.remove(
-                                          paginatedDocs[index].id,
-                                        );
-                                      },
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
-                      ],
+                              ],
+                            ),
+                        ],
+                      ),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -276,6 +309,89 @@ class _TeachersTableState extends State<_TeachersTable> {
         );
       },
     );
+  }
+
+  void _showTeacherDetails(BuildContext context, Map<String, dynamic> data) {
+    showDialog<void>(
+      context: context,
+      builder: (_) => RecordDetailsDialog(
+        title: 'Teacher Details',
+        data: data,
+        columns: TeachersPage.fields,
+      ),
+    );
+  }
+
+  DataCell _detailsCell(
+    BuildContext context,
+    String teacherId,
+    Map<String, dynamic> data,
+    Widget child,
+  ) {
+    return DataCell(
+      MouseRegion(
+        cursor: SystemMouseCursors.click,
+        onEnter: (_) => _setHoveredTeacher(teacherId),
+        onExit: (_) => _clearHoveredTeacher(teacherId),
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => _showTeacherDetails(context, data),
+          child: child,
+        ),
+      ),
+    );
+  }
+
+  void _setHoveredTeacher(String teacherId) {
+    if (_hoverPaused) return;
+    if (_hoveredTeacherId == teacherId) return;
+    setState(() => _hoveredTeacherId = teacherId);
+  }
+
+  void _clearHoveredTeacher(String teacherId) {
+    if (_hoverPaused) return;
+    if (_hoveredTeacherId != teacherId) return;
+    setState(() => _hoveredTeacherId = null);
+  }
+
+  void _pauseHoverForScroll(PointerSignalEvent event) {
+    if (event is! PointerScrollEvent) return;
+    _hoverResumeTimer?.cancel();
+    if (!_hoverPaused || _hoveredTeacherId != null) {
+      setState(() {
+        _hoverPaused = true;
+        _hoveredTeacherId = null;
+      });
+    }
+    _hoverResumeTimer = Timer(const Duration(milliseconds: 150), () {
+      if (!mounted) return;
+      setState(() => _hoverPaused = false);
+    });
+  }
+
+  void _setAllSelected(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+    bool selected,
+  ) {
+    setState(() {
+      if (selected) {
+        _selectedTeacherIds
+          ..clear()
+          ..addAll(docs.map((doc) => doc.id));
+      } else {
+        _selectedTeacherIds.clear();
+      }
+    });
+  }
+
+  void _setTeacherSelected(String teacherId, bool selected) {
+    setState(() {
+      if (selected) {
+        _selectedTeacherIds.add(teacherId);
+      } else {
+        _selectedTeacherIds.remove(teacherId);
+      }
+    });
   }
 
   Future<void> _bulkArchiveTeachers(
@@ -441,31 +557,4 @@ String _teacherBirthdate(Map<String, dynamic> data) {
   }
   if (value is DateTime) return DateFormat('MMM d, yyyy').format(value);
   return '-';
-}
-
-Future<bool> _confirmArchiveTeacher(
-  BuildContext context,
-  String teacherName,
-) async {
-  return await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Archive teacher?'),
-          content: Text(
-            'This will remove $teacherName from the active teachers list. You can still keep the record for archive/history.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton.icon(
-              icon: const Icon(Icons.archive_outlined),
-              label: const Text('Archive'),
-              onPressed: () => Navigator.pop(context, true),
-            ),
-          ],
-        ),
-      ) ??
-      false;
 }

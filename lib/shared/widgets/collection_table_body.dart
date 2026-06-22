@@ -1,4 +1,7 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/gestures.dart'
+    show PointerScrollEvent, PointerSignalEvent;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -22,10 +25,15 @@ class CollectionTableBody extends StatefulWidget {
     this.filters = const {},
     this.confirmArchive = false,
     this.enableBulkArchive = false,
+    this.showArchiveAction = true,
+    this.teacherTableStyle = false,
+    this.itemLabel = 'records',
+    this.columnLabels = const {},
     required this.initialItemsPerPage,
     this.schoolYearId,
     this.onEdit,
     this.onBulkArchive,
+    this.onRowTap,
   });
 
   final String collection;
@@ -36,6 +44,10 @@ class CollectionTableBody extends StatefulWidget {
   final Map<String, String> filters;
   final bool confirmArchive;
   final bool enableBulkArchive;
+  final bool showArchiveAction;
+  final bool teacherTableStyle;
+  final String itemLabel;
+  final Map<String, String> columnLabels;
   final int initialItemsPerPage;
   final String? schoolYearId;
   final void Function(
@@ -46,6 +58,13 @@ class CollectionTableBody extends StatefulWidget {
   )?
   onEdit;
   final Future<void> Function(List<String> docIds)? onBulkArchive;
+  final void Function(
+    BuildContext context,
+    String docId,
+    Map<String, dynamic> data,
+    String? schoolYearId,
+  )?
+  onRowTap;
 
   @override
   State<CollectionTableBody> createState() => CollectionTableBodyState();
@@ -57,12 +76,21 @@ class CollectionTableBodyState extends State<CollectionTableBody> {
   late int _currentPage;
   late int _itemsPerPage;
   final Set<String> _selectedRecordIds = {};
+  String? _hoveredRecordId;
+  Timer? _hoverResumeTimer;
+  bool _hoverPaused = false;
 
   @override
   void initState() {
     super.initState();
     _currentPage = 0;
     _itemsPerPage = widget.initialItemsPerPage;
+  }
+
+  @override
+  void dispose() {
+    _hoverResumeTimer?.cancel();
+    super.dispose();
   }
 
   @override
@@ -114,100 +142,126 @@ class CollectionTableBodyState extends State<CollectionTableBody> {
                 ),
                 const SizedBox(height: 12),
               ],
-              FullWidthHorizontalTable(
-                child: DataTable(
-                  onSelectAll: widget.enableBulkArchive
-                      ? (selected) {
-                          setState(() {
-                            if (selected == true) {
-                              _selectedRecordIds
-                                ..clear()
-                                ..addAll(docs.map((doc) => doc.id));
-                            } else {
-                              _selectedRecordIds.clear();
+              Listener(
+                onPointerSignal: _pauseHoverForScroll,
+                child: FullWidthHorizontalTable(
+                  child: DataTable(
+                    headingRowHeight: widget.teacherTableStyle ? 44 : 48,
+                    dataRowMinHeight: hasCountsColumn
+                        ? 96
+                        : widget.teacherTableStyle
+                        ? 52
+                        : 44,
+                    dataRowMaxHeight: hasCountsColumn
+                        ? 132
+                        : widget.teacherTableStyle
+                        ? 64
+                        : 44,
+                    columns: [
+                      if (widget.enableBulkArchive)
+                        DataColumn(
+                          label: Checkbox(
+                            value: selectedCount == docs.length,
+                            tristate:
+                                selectedCount > 0 &&
+                                selectedCount < docs.length,
+                            onChanged: (selected) =>
+                                _setAllSelected(docs, selected == true),
+                          ),
+                        ),
+                      const DataColumn(label: Text('#')),
+                      for (final column in widget.columns)
+                        DataColumn(
+                          label: Text(
+                            widget.columnLabels[column] ??
+                                (column == 'fullName'
+                                    ? 'Full Name'
+                                    : adminLabel(column)),
+                          ),
+                        ),
+                      const DataColumn(label: Text('Actions')),
+                    ],
+                    rows: [
+                      for (var index = 0; index < paginatedDocs.length; index++)
+                        DataRow(
+                          color: WidgetStateProperty.resolveWith((states) {
+                            final colorScheme = Theme.of(context).colorScheme;
+                            if (_hoveredRecordId == paginatedDocs[index].id) {
+                              return colorScheme.primary.withAlpha(20);
                             }
-                          });
-                        }
-                      : null,
-                  headingRowHeight: 48,
-                  dataRowMinHeight: hasCountsColumn ? 96 : 44,
-                  dataRowMaxHeight: hasCountsColumn ? 132 : 44,
-                  columns: [
-                    const DataColumn(label: Text('#')),
-                    for (final column in widget.columns)
-                      DataColumn(
-                        label: Text(
-                          column == 'fullName'
-                              ? 'Full Name'
-                              : adminLabel(column),
-                        ),
-                      ),
-                    const DataColumn(label: Text('Actions')),
-                  ],
-                  rows: [
-                    for (var index = 0; index < paginatedDocs.length; index++)
-                      DataRow(
-                        selected: _selectedRecordIds.contains(
-                          paginatedDocs[index].id,
-                        ),
-                        onSelectChanged: widget.enableBulkArchive
-                            ? (selected) {
-                                setState(() {
-                                  if (selected == true) {
-                                    _selectedRecordIds.add(
-                                      paginatedDocs[index].id,
-                                    );
-                                  } else {
-                                    _selectedRecordIds.remove(
-                                      paginatedDocs[index].id,
-                                    );
-                                  }
-                                });
-                              }
-                            : null,
-                        cells: [
-                          DataCell(Text('${start + index + 1}')),
-                          for (final column in widget.columns)
-                            DataCell(
-                              _buildCell(
-                                context,
-                                column == 'fullName'
-                                    ? adminPersonName(
-                                        paginatedDocs[index].data(),
-                                      )
-                                    : paginatedDocs[index].data()[column],
-                                column,
-                              ),
-                            ),
-                          DataCell(
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (widget.onEdit != null)
-                                  IconButton(
-                                    tooltip: 'Edit',
-                                    icon: const Icon(Icons.edit_outlined),
-                                    onPressed: () => widget.onEdit!(
-                                      context,
-                                      paginatedDocs[index].id,
-                                      paginatedDocs[index].data(),
-                                      widget.schoolYearId,
-                                    ),
+                            if (states.contains(WidgetState.selected)) {
+                              return colorScheme.primary.withAlpha(12);
+                            }
+                            return null;
+                          }),
+                          selected: _selectedRecordIds.contains(
+                            paginatedDocs[index].id,
+                          ),
+                          cells: [
+                            if (widget.enableBulkArchive)
+                              DataCell(
+                                Checkbox(
+                                  value: _selectedRecordIds.contains(
+                                    paginatedDocs[index].id,
                                   ),
-                                IconButton(
-                                  tooltip: 'Archive',
-                                  icon: const Icon(Icons.archive_outlined),
-                                  onPressed: () => _archiveRecord(
-                                    context,
-                                    paginatedDocs[index],
+                                  onChanged: (selected) => _setRecordSelected(
+                                    paginatedDocs[index].id,
+                                    selected == true,
                                   ),
                                 ),
-                              ],
+                              ),
+                            _detailsCell(
+                              recordId: paginatedDocs[index].id,
+                              child: Text('${start + index + 1}'),
+                              onTap: () =>
+                                  _openRecord(context, paginatedDocs[index]),
                             ),
-                          ),
-                        ],
-                      ),
-                  ],
+                            for (final column in widget.columns)
+                              _detailsCell(
+                                recordId: paginatedDocs[index].id,
+                                child: _buildCell(
+                                  context,
+                                  column == 'fullName'
+                                      ? adminPersonName(
+                                          paginatedDocs[index].data(),
+                                        )
+                                      : paginatedDocs[index].data()[column],
+                                  column,
+                                ),
+                                onTap: () =>
+                                    _openRecord(context, paginatedDocs[index]),
+                              ),
+                            DataCell(
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (widget.onEdit != null)
+                                    IconButton(
+                                      tooltip: 'Edit',
+                                      icon: const Icon(Icons.edit_outlined),
+                                      onPressed: () => widget.onEdit!(
+                                        context,
+                                        paginatedDocs[index].id,
+                                        paginatedDocs[index].data(),
+                                        widget.schoolYearId,
+                                      ),
+                                    ),
+                                  if (widget.showArchiveAction)
+                                    IconButton(
+                                      tooltip: 'Archive',
+                                      icon: const Icon(Icons.archive_outlined),
+                                      onPressed: () => _archiveRecord(
+                                        context,
+                                        paginatedDocs[index],
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(height: 12),
@@ -215,7 +269,7 @@ class CollectionTableBodyState extends State<CollectionTableBody> {
                 currentPage: currentPage,
                 totalItems: docs.length,
                 itemsPerPage: _itemsPerPage,
-                itemLabel: 'records',
+                itemLabel: widget.itemLabel,
                 itemsPerPageOptions: _itemsPerPageOptions,
                 onItemsPerPageChanged: (value) {
                   setState(() {
@@ -277,6 +331,84 @@ class CollectionTableBodyState extends State<CollectionTableBody> {
     if (mounted) setState(() => _selectedRecordIds.remove(doc.id));
   }
 
+  void _openRecord(
+    BuildContext context,
+    QueryDocumentSnapshot<Map<String, dynamic>> doc,
+  ) {
+    widget.onRowTap?.call(context, doc.id, doc.data(), widget.schoolYearId);
+  }
+
+  DataCell _detailsCell({
+    required String recordId,
+    required Widget child,
+    required VoidCallback onTap,
+  }) {
+    return DataCell(
+      MouseRegion(
+        cursor: SystemMouseCursors.click,
+        onEnter: (_) => _setHoveredRecord(recordId),
+        onExit: (_) => _clearHoveredRecord(recordId),
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          child: child,
+        ),
+      ),
+    );
+  }
+
+  void _setHoveredRecord(String recordId) {
+    if (_hoverPaused) return;
+    if (_hoveredRecordId == recordId) return;
+    setState(() => _hoveredRecordId = recordId);
+  }
+
+  void _setAllSelected(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+    bool selected,
+  ) {
+    setState(() {
+      if (selected) {
+        _selectedRecordIds
+          ..clear()
+          ..addAll(docs.map((doc) => doc.id));
+      } else {
+        _selectedRecordIds.clear();
+      }
+    });
+  }
+
+  void _setRecordSelected(String recordId, bool selected) {
+    setState(() {
+      if (selected) {
+        _selectedRecordIds.add(recordId);
+      } else {
+        _selectedRecordIds.remove(recordId);
+      }
+    });
+  }
+
+  void _clearHoveredRecord(String recordId) {
+    if (_hoverPaused) return;
+    if (_hoveredRecordId != recordId) return;
+    setState(() => _hoveredRecordId = null);
+  }
+
+  void _pauseHoverForScroll(PointerSignalEvent event) {
+    if (event is! PointerScrollEvent) return;
+    _hoverResumeTimer?.cancel();
+    if (!_hoverPaused || _hoveredRecordId != null) {
+      setState(() {
+        _hoverPaused = true;
+        _hoveredRecordId = null;
+      });
+    }
+    _hoverResumeTimer = Timer(const Duration(milliseconds: 150), () {
+      if (!mounted) return;
+      setState(() => _hoverPaused = false);
+    });
+  }
+
   Future<void> _bulkArchiveRecords(
     BuildContext context,
     int selectedCount,
@@ -336,6 +468,13 @@ class CollectionTableBodyState extends State<CollectionTableBody> {
         _ => null,
       };
       return Text(date == null ? '-' : DateFormat('MMM d, yyyy').format(date));
+    }
+    if (lower == 'address') {
+      final address = adminFormatValue(value);
+      return SizedBox(
+        width: 105,
+        child: Text(address, maxLines: 1, overflow: TextOverflow.ellipsis),
+      );
     }
     if (lower.contains('status')) {
       final label = value?.toString() ?? '-';

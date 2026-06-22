@@ -16,6 +16,11 @@ class CollectionTable extends StatelessWidget {
     this.itemsPerPage = 10,
     this.confirmArchive = false,
     this.enableBulkArchive = false,
+    this.showArchiveAction = true,
+    this.teacherTableStyle = false,
+    this.itemLabel = 'records',
+    this.columnLabels = const {},
+    this.onRowTap,
     this.onEdit,
   });
 
@@ -27,6 +32,17 @@ class CollectionTable extends StatelessWidget {
   final int itemsPerPage;
   final bool confirmArchive;
   final bool enableBulkArchive;
+  final bool showArchiveAction;
+  final bool teacherTableStyle;
+  final String itemLabel;
+  final Map<String, String> columnLabels;
+  final void Function(
+    BuildContext context,
+    String docId,
+    Map<String, dynamic> data,
+    String? schoolYearId,
+  )?
+  onRowTap;
   final void Function(
     BuildContext context,
     String docId,
@@ -61,6 +77,11 @@ class CollectionTable extends StatelessWidget {
             filters: filters,
             confirmArchive: confirmArchive,
             enableBulkArchive: enableBulkArchive,
+            showArchiveAction: showArchiveAction,
+            teacherTableStyle: teacherTableStyle,
+            itemLabel: itemLabel,
+            columnLabels: columnLabels,
+            onRowTap: onRowTap,
             onEdit: onEdit,
             onArchive: (docId) async {
               await app.repository
@@ -112,6 +133,11 @@ class CollectionTable extends StatelessWidget {
       filters: filters,
       confirmArchive: confirmArchive,
       enableBulkArchive: enableBulkArchive,
+      showArchiveAction: showArchiveAction,
+      teacherTableStyle: teacherTableStyle,
+      itemLabel: itemLabel,
+      columnLabels: columnLabels,
+      onRowTap: onRowTap,
       initialItemsPerPage: itemsPerPage,
       onEdit: onEdit,
       onArchive: (docId) =>
