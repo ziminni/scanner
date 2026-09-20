@@ -20,6 +20,7 @@ class _EditStudentDialogState extends State<_EditStudentDialog> {
   DateTime? _birthdate;
   String? _selectedSection;
   String? _selectedGender;
+  bool _isAral = false;
   bool _saving = false;
   String? _error;
 
@@ -39,6 +40,7 @@ class _EditStudentDialogState extends State<_EditStudentDialog> {
     _birthdate = _dateFromValue(widget.data['birthdate']);
     _selectedGender = widget.data['gender'] as String?;
     _selectedSection = widget.data['section'] as String?;
+    _isAral = widget.data['isAral'] as bool? ?? false;
   }
 
   @override
@@ -122,6 +124,17 @@ class _EditStudentDialogState extends State<_EditStudentDialog> {
                                 setState(() => _selectedSection = section),
                     ),
                   ),
+                  SizedBox(
+                    width: 220,
+                    child: CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Part of ARAL'),
+                      value: _isAral,
+                      onChanged: _saving
+                          ? null
+                          : (value) => setState(() => _isAral = value ?? false),
+                    ),
+                  ),
                   if (_error != null)
                     SizedBox(
                       width: double.infinity,
@@ -188,6 +201,7 @@ class _EditStudentDialogState extends State<_EditStudentDialog> {
                 : Timestamp.fromDate(_birthdate!),
             'gender': gender,
             'section': section,
+            'isAral': _isAral,
             'updatedAt': FieldValue.serverTimestamp(),
           }, SetOptions(merge: true));
       await app.audit.record(

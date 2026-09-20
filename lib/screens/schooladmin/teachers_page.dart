@@ -6,6 +6,8 @@ import 'package:flutter/gestures.dart'
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/utils/download_file.dart';
+import '../../core/utils/section_qr_worker_client.dart';
 import '../../models/models.dart';
 import '../../shared/widgets/admin.dart';
 import '../../shared/widgets/app_widgets.dart';
@@ -80,20 +82,36 @@ class _TeachersPageState extends State<TeachersPage> {
             ),
           ),
         ),
-        OutlinedButton.icon(
-          icon: const Icon(Icons.upload_file_outlined),
-          label: const Text('Import teachers'),
-          onPressed: () => showDialog<void>(
-            context: context,
-            builder: (_) => const _ImportTeachersDialog(),
-          ),
-        ),
-        FilledButton.icon(
-          icon: const Icon(Icons.add),
-          label: const Text('Add teacher'),
-          onPressed: () => showDialog<void>(
-            context: context,
-            builder: (_) => const _AddTeacherDialog(),
+        MenuAnchor(
+          alignmentOffset: const Offset(-27, 0),
+          menuChildren: [
+            MenuItemButton(
+              leadingIcon: const Icon(Icons.person_add_outlined),
+              onPressed: () => showDialog<void>(
+                context: context,
+                builder: (_) => const _AddTeacherDialog(),
+              ),
+              child: const Text('Add teacher'),
+            ),
+            MenuItemButton(
+              leadingIcon: const Icon(Icons.upload_file_outlined),
+              onPressed: () => showDialog<void>(
+                context: context,
+                builder: (_) => const _ImportTeachersDialog(),
+              ),
+              child: const Text('Import teachers'),
+            ),
+          ],
+          builder: (context, controller, child) => FilledButton(
+            onPressed: controller.isOpen ? controller.close : controller.open,
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('Add teacher'),
+                SizedBox(width: 4),
+                Icon(Icons.arrow_drop_down),
+              ],
+            ),
           ),
         ),
       ],

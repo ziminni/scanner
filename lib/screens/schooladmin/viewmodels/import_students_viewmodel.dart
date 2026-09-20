@@ -28,6 +28,8 @@ class ImportStudentsViewModel extends BaseViewModel {
   String? fileName;
   String? selectedSection;
   int importedCount = 0;
+  String? successMessage;
+  final List<String> warnings = [];
 
   bool get hasFile => _bytes != null;
 
@@ -60,6 +62,8 @@ class ImportStudentsViewModel extends BaseViewModel {
     _bytes = file.bytes;
     fileName = file.name;
     importedCount = 0;
+    successMessage = null;
+    warnings.clear();
     setError(null);
     notifyListeners();
   }
@@ -80,6 +84,8 @@ class ImportStudentsViewModel extends BaseViewModel {
 
     setBusy(true);
     try {
+      successMessage = null;
+      warnings.clear();
       final schoolYear = await _app.attendance.activeSchoolYear();
       if (schoolYear == null) {
         setError('Create an active school year before importing students.');
@@ -106,20 +112,11 @@ class ImportStudentsViewModel extends BaseViewModel {
         return false;
       }
 
-      final existingLrns = await _app.repository.schoolYearFieldValues(
-        schoolYearId: schoolYear.id,
-        collection: 'students',
-        field: 'lrn',
-      );
-      final alreadyExisting =
-          records
-              .map((record) => record['lrn']?.toString().trim() ?? '')
-              .where((lrn) => existingLrns.contains(lrn.toLowerCase()))
-              .toSet()
-              .toList()
-            ..sort();
-      if (alreadyExisting.isNotEmpty) {
-        setError('LRN already exists: ${alreadyExisting.take(5).join(', ')}');
+      final duplicate = await _firstActiveDuplicate(records, schoolYear.id);
+      if (duplicate != null) {
+        setError(
+          'LRN ${duplicate.lrn} already belongs to ${duplicate.name} in ${duplicate.section}.',
+        );
         return false;
       }
 
@@ -146,6 +143,8 @@ class ImportStudentsViewModel extends BaseViewModel {
         },
       );
       importedCount = records.length;
+      successMessage =
+          '$importedCount students successfully imported to section $section';
       setError(null);
       return true;
     } on FormatException catch (error) {
@@ -157,6 +156,38 @@ class ImportStudentsViewModel extends BaseViewModel {
     } finally {
       setBusy(false);
     }
+  }
+
+  Future<_ActiveStudentDuplicate?> _firstActiveDuplicate(
+    List<Map<String, dynamic>> records,
+    String schoolYearId,
+  ) async {
+    final lrns =
+        records
+            .map((record) => record['lrn']?.toString().trim() ?? '')
+            .where((lrn) => lrn.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort();
+    for (var start = 0; start < lrns.length; start += 30) {
+      final batch = lrns.skip(start).take(30).toList();
+      final snapshot = await _app.repository
+          .schoolYearCollection(schoolYearId, 'students')
+          .where('archived', isEqualTo: false)
+          .where('lrn', whereIn: batch)
+          .get();
+      if (snapshot.docs.isEmpty) continue;
+      final doc = snapshot.docs.first;
+      final data = doc.data();
+      return _ActiveStudentDuplicate(
+        lrn: data['lrn']?.toString().trim() ?? doc.id,
+        name: _studentName(data),
+        section: data['section']?.toString().trim().isNotEmpty == true
+            ? data['section'].toString().trim()
+            : 'Unassigned',
+      );
+    }
+    return null;
   }
 
   List<Map<String, dynamic>> _parseRecords(
@@ -185,7 +216,7 @@ class ImportStudentsViewModel extends BaseViewModel {
       final lastName = _text(row, 1);
       final firstName = _text(row, 2);
       final rowNumber = index + 1;
-      if (_isBlankRow(row)) continue;
+      if (lrn.isEmpty && lastName.isEmpty && firstName.isEmpty) continue;
       if (lrn.isEmpty || lastName.isEmpty || firstName.isEmpty) {
         throw FormatException(
           'Row $rowNumber must include LRN, last name, and first name.',
@@ -196,14 +227,15 @@ class ImportStudentsViewModel extends BaseViewModel {
         'lrn': lrn,
         'lastName': lastName,
         'firstName': firstName,
-        'middleName': _text(row, 3),
+        'middleName': _text(row, 3).isEmpty ? '-' : _text(row, 3),
         'gender': _gender(row, 4, rowNumber),
         'birthdate': _date(row, 5),
         'address': _text(row, 6),
         'guardianName': _text(row, 7),
-        'guardianContact': _text(row, 8),
+        'guardianContact': _guardianContact(row, 8, rowNumber),
         'section': section,
         'status': 'Active',
+        'isAral': false,
         'schoolYearId': schoolYearId,
         'schoolYear': schoolYearName,
         'archived': false,
@@ -237,13 +269,6 @@ class ImportStudentsViewModel extends BaseViewModel {
       if (!seen.add(key)) duplicates.add(lrn);
     }
     return duplicates.toList()..sort();
-  }
-
-  bool _isBlankRow(List<dynamic> row) {
-    return row.every((cell) {
-      if (cell == null) return true;
-      return cell.toString().trim().isEmpty;
-    });
   }
 
   String _normalizeHeader(String value) {
@@ -286,23 +311,65 @@ class ImportStudentsViewModel extends BaseViewModel {
   Timestamp? _date(List<dynamic> row, int index) {
     if (index >= row.length) return null;
     final value = row[index];
-    final date = value is DateTime
-        ? value
-        : _parseDateText(value?.toString() ?? '');
+    final date = switch (value) {
+      DateTime dateTime => dateTime,
+      num serial => _excelSerialDate(serial),
+      _ => _parseDateText(value?.toString() ?? ''),
+    };
     return date == null ? null : Timestamp.fromDate(date);
+  }
+
+  DateTime? _excelSerialDate(num serial) {
+    if (serial <= 0) return null;
+    final days = serial.floor();
+    final fraction = serial - days;
+    final base = DateTime(1899, 12, 30).add(Duration(days: days));
+    return base.add(Duration(milliseconds: (fraction * 86400000).round()));
   }
 
   DateTime? _parseDateText(String raw) {
     final value = raw.trim();
     if (value.isEmpty) return null;
+    final serial = num.tryParse(value);
+    if (serial != null) return _excelSerialDate(serial);
     final iso = DateTime.tryParse(value);
     if (iso != null) return iso;
-    for (final pattern in ['MM/dd/yyyy', 'M/d/yyyy', 'yyyy-MM-dd']) {
+    for (final pattern in [
+      'MM/dd/yyyy',
+      'M/d/yyyy',
+      'yyyy-MM-dd',
+      'MMM d, yyyy',
+      'MMMM d, yyyy',
+      'd MMM yyyy',
+      'd MMMM yyyy',
+    ]) {
       try {
         return DateFormat(pattern).parseStrict(value);
       } catch (_) {}
     }
     return null;
+  }
+
+  String _guardianContact(List<dynamic> row, int index, int rowNumber) {
+    final value = _text(row, index);
+    if (value.isEmpty) return '-';
+    final normalized = value.replaceAll(RegExp(r'\D'), '');
+    if (RegExp(r'^09\d{9}$').hasMatch(normalized)) return normalized;
+    warnings.add(
+      'Row $rowNumber guardian contact "$value" was invalid and saved as -.',
+    );
+    return '-';
+  }
+
+  String _studentName(Map<String, dynamic> data) {
+    final lastName = data['lastName']?.toString().trim() ?? '';
+    final firstName = data['firstName']?.toString().trim() ?? '';
+    final middleName = data['middleName']?.toString().trim() ?? '';
+    final middleInitial = middleName.isEmpty || middleName == '-'
+        ? ''
+        : ' ${middleName[0]}.';
+    final name = '$lastName, $firstName$middleInitial'.trim();
+    return name == ',' ? 'Unnamed student' : name;
   }
 
   String _friendlyError(Object error) {
@@ -318,4 +385,16 @@ class ImportStudentsViewModel extends BaseViewModel {
     }
     return 'Import failed. Please check the spreadsheet and try again.';
   }
+}
+
+class _ActiveStudentDuplicate {
+  const _ActiveStudentDuplicate({
+    required this.lrn,
+    required this.name,
+    required this.section,
+  });
+
+  final String lrn;
+  final String name;
+  final String section;
 }

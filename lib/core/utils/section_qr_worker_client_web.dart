@@ -10,18 +10,21 @@ class SectionQrWorkerStudent {
     required this.lastName,
     required this.firstName,
     required this.middleName,
+    this.isAral = false,
   });
 
   final String lrn;
   final String lastName;
   final String firstName;
   final String middleName;
+  final bool isAral;
 
-  Map<String, String> toMap() => {
+  Map<String, Object> toMap() => {
     'lrn': lrn,
     'lastName': lastName,
     'firstName': firstName,
     'middleName': middleName,
+    'isAral': isAral,
   };
 }
 

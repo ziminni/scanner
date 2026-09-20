@@ -23,9 +23,10 @@ self.onmessage = async (event) => {
         gradeSection: gradeSection.toUpperCase(),
         identifierLabel: identifierLabel.toUpperCase(),
         cardTitle: cardTitle.toUpperCase(),
+        qrColor: student.isAral ? '#0f7d4d' : '#121c18',
       });
       files.push({
-        name: `${safeFileName(`${student.lastName || ''} ${student.firstName || ''}`)}.png`,
+        name: `${safeFileName(studentFileName(student).toUpperCase())}.png`,
         bytes: png,
       });
       postProgress(index + 1, students.length, displayName);
@@ -42,75 +43,39 @@ self.onmessage = async (event) => {
   }
 };
 
-async function temporaryIdPng({ lrn, name, gradeSection, identifierLabel, cardTitle }) {
+async function temporaryIdPng({ lrn, name, gradeSection, identifierLabel, cardTitle, qrColor }) {
   const qr = qrcode(0, 'M');
   qr.addData(lrn);
   qr.make();
 
-  const width = 720;
-  const height = 980;
-  const qrSize = 430;
-  const qrLeft = (width - qrSize) / 2;
-  const qrTop = 86;
-  const moduleCount = qr.getModuleCount();
-  const quietZone = 4;
-  const moduleSize = Math.floor(qrSize / (moduleCount + quietZone * 2));
-  const renderedSize = moduleSize * (moduleCount + quietZone * 2);
-  const offset = (qrSize - renderedSize) / 2;
-
-  const canvas = new OffscreenCanvas(width, height);
+  const size = 720;
+  const margin = 20;
+  const canvas = new OffscreenCanvas(size, size);
   const context = canvas.getContext('2d');
   if (!context) {
     throw new Error('Unable to create PNG canvas.');
   }
 
-  context.fillStyle = '#ffffff';
-  context.fillRect(0, 0, width, height);
-
-  context.fillStyle = '#0f7d4d';
-  context.fillRect(0, 0, width, 72);
-
-  context.fillStyle = '#ffffff';
-  context.font = '700 24px Arial, Helvetica, sans-serif';
-  context.textBaseline = 'alphabetic';
-  context.fillText(cardTitle, 40, 47);
+  const moduleCount = qr.getModuleCount();
+  const quietZone = 4;
+  const availableSize = size - margin * 2;
+  const moduleSize = Math.floor(availableSize / (moduleCount + quietZone * 2));
+  const renderedSize = moduleSize * (moduleCount + quietZone * 2);
+  const qrLeft = Math.round((size - renderedSize) / 2);
+  const qrTop = Math.round((size - renderedSize) / 2);
 
   context.fillStyle = '#ffffff';
-  context.fillRect(qrLeft, qrTop, qrSize, qrSize);
+  context.fillRect(0, 0, size, size);
 
-  context.fillStyle = '#121c18';
+  context.fillStyle = qrColor || '#121c18';
   for (let row = 0; row < moduleCount; row++) {
     for (let col = 0; col < moduleCount; col++) {
       if (!qr.isDark(row, col)) continue;
-      const x = qrLeft + offset + (col + quietZone) * moduleSize;
-      const y = qrTop + offset + (row + quietZone) * moduleSize;
+      const x = qrLeft + (col + quietZone) * moduleSize;
+      const y = qrTop + (row + quietZone) * moduleSize;
       context.fillRect(x, y, moduleSize, moduleSize);
     }
   }
-
-  context.fillStyle = '#e3f5eb';
-  context.fillRect(40, 570, 639, 330);
-
-  context.fillStyle = '#121c18';
-  context.font = '700 42px Arial, Helvetica, sans-serif';
-  drawTextToFit(context, name, 74, 674, 570, 42);
-
-  context.font = '700 24px Arial, Helvetica, sans-serif';
-  drawTextToFit(context, gradeSection, 74, 742, 570, 24);
-
-  context.font = '24px Arial, Helvetica, sans-serif';
-  drawTextToFit(context, `${identifierLabel}: ${lrn}`, 74, 796, 570, 24);
-
-  context.fillStyle = '#0f7d4d';
-  context.font = '700 24px Arial, Helvetica, sans-serif';
-  drawTextToFit(
-    context,
-    'Leon Garcia Sr. National High School',
-    74,
-    878,
-    570,
-    24,
-  );
 
   const blob = await canvas.convertToBlob({ type: 'image/png' });
   return new Uint8Array(await blob.arrayBuffer());
@@ -121,6 +86,12 @@ function postProgress(current, total, studentName) {
 }
 
 function studentName(student) {
+  const middle = (student.middleName || '').trim();
+  const middleInitial = middle ? ` ${middle[0]}.` : '';
+  return `${student.lastName || ''}, ${student.firstName || ''}${middleInitial}`.trim();
+}
+
+function studentFileName(student) {
   const middle = (student.middleName || '').trim();
   const middleInitial = middle ? ` ${middle[0]}.` : '';
   return `${student.lastName || ''}, ${student.firstName || ''}${middleInitial}`.trim();

@@ -14,61 +14,45 @@ class _ActiveSchoolYearBanner extends StatelessWidget {
         ? 'Create a school year to begin collecting attendance data'
         : _schoolYearRange(schoolYear!);
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF026B2F), Color(0xFF03913F)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF026B2F).withAlpha(40),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'ACTIVE SCHOOL YEAR',
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: Colors.white.withAlpha(190),
-                    fontWeight: FontWeight.w800,
-                  ),
+    return RepaintBoundary(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 520;
+          final details = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'ACTIVE SCHOOL YEAR',
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: Colors.white.withAlpha(190),
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: .7,
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  loading ? 'Loading...' : title,
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w900,
-                  ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                loading ? 'Loading...' : title,
+                maxLines: compact ? 2 : 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w900,
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  subtitle,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: Colors.white.withAlpha(210),
-                  ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                subtitle,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: Colors.white.withAlpha(220),
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 16),
-          Container(
+              ),
+            ],
+          );
+          final pill = Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
+              color: Colors.white.withAlpha(236),
+              borderRadius: BorderRadius.circular(999),
             ),
             child: Text(
               schoolYear == null ? 'Inactive' : 'Active',
@@ -76,12 +60,48 @@ class _ActiveSchoolYearBanner extends StatelessWidget {
                 color: schoolYear == null
                     ? Colors.grey.shade800
                     : const Color(0xFF026B2F),
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w900,
                 fontSize: 12,
               ),
             ),
-          ),
-        ],
+          );
+
+          return Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF064E3B), Color(0xFF059669)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF026B2F).withAlpha(20),
+                  blurRadius: 14,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: compact
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Align(alignment: Alignment.centerLeft, child: pill),
+                      const SizedBox(height: 14),
+                      details,
+                    ],
+                  )
+                : Row(
+                    children: [
+                      Expanded(child: details),
+                      const SizedBox(width: 16),
+                      pill,
+                    ],
+                  ),
+          );
+        },
       ),
     );
   }

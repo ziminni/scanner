@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 
+import '../../core/constants/assets.dart';
 import '../../core/constants/colors.dart';
 import '../../core/services/app_controller.dart';
 

@@ -6,6 +6,7 @@ import '../../routes/app_routes.dart';
 import 'scanner_theme.dart';
 import 'viewmodels/scanner_home_viewmodel.dart';
 import 'widgets/home_leaderboard.dart';
+import 'widgets/home_sync_status.dart';
 
 class ScannerHomePage extends StatefulWidget {
   const ScannerHomePage({super.key});
@@ -39,34 +40,90 @@ class _ScannerHomePageState extends State<ScannerHomePage> {
     return ColoredBox(
       color: ScannerTheme.background,
       child: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         children: [
           Container(
-            padding: const EdgeInsets.all(16),
-            decoration: ScannerTheme.panelDecoration(
-              color: ScannerTheme.surfaceSoft,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
+            padding: const EdgeInsets.all(18),
+            decoration: ScannerTheme.heroDecoration(),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final compact = constraints.maxWidth < 420;
+                final iconSize = compact ? 40.0 : 54.0;
+                final iconRadius = compact ? 13.0 : 17.0;
+
+                final title = Text(
                   'Welcome, ${user.fullName}',
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    color: ScannerTheme.text,
-                    fontWeight: FontWeight.w700,
+                  maxLines: compact ? 2 : 1,
+                  overflow: TextOverflow.ellipsis,
+                  style:
+                      (compact
+                              ? theme.textTheme.titleLarge
+                              : theme.textTheme.headlineSmall)
+                          ?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                          ),
+                );
+
+                final subtitle = Text(
+                  'Scan IDs, review recent logs, and keep attendance moving smoothly.',
+                  maxLines: compact ? 2 : null,
+                  overflow: compact ? TextOverflow.ellipsis : null,
+                  style:
+                      (compact
+                              ? theme.textTheme.bodyMedium
+                              : theme.textTheme.bodyLarge)
+                          ?.copyWith(color: Colors.white.withAlpha(226)),
+                );
+
+                final icon = Container(
+                  width: iconSize,
+                  height: iconSize,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withAlpha(34),
+                    borderRadius: BorderRadius.circular(iconRadius),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Use this scanner module to record student and teacher Time In and Time Out attendance.',
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    color: ScannerTheme.text,
+                  child: Icon(
+                    Icons.qr_code_scanner,
+                    color: Colors.white,
+                    size: compact ? 24 : 30,
                   ),
-                ),
-              ],
+                );
+
+                if (compact) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          icon,
+                          const SizedBox(width: 12),
+                          Expanded(child: title),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      subtitle,
+                    ],
+                  );
+                }
+
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    icon,
+                    const SizedBox(width: 18),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [title, const SizedBox(height: 8), subtitle],
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 22),
           AnimatedBuilder(
             animation: _viewModel!,
             builder: (context, _) {
@@ -88,18 +145,34 @@ class _ScannerHomePageState extends State<ScannerHomePage> {
                   ),
                 );
               }
-              return HomeLeaderboard(viewModel: viewModel);
+              return Column(
+                children: [
+                  HomeSyncStatus(
+                    studentStatus: viewModel.studentSync,
+                    teacherStatus: viewModel.teacherSync,
+                    onSyncStudents: viewModel.syncStudents,
+                    onSyncTeachers: viewModel.syncTeachers,
+                  ),
+                  const SizedBox(height: 16),
+                  LoggedScanSyncStatus(
+                    status: viewModel.loggedScanSync,
+                    onSyncLoggedPeople: viewModel.syncLoggedPeople,
+                  ),
+                  const SizedBox(height: 16),
+                  HomeLeaderboard(viewModel: viewModel),
+                ],
+              );
             },
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 22),
           GridView(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-              maxCrossAxisExtent: 360,
-              mainAxisExtent: 150,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
+              maxCrossAxisExtent: 420,
+              mainAxisExtent: 174,
+              crossAxisSpacing: 16,
+              mainAxisSpacing: 16,
             ),
             children: [
               _ScannerHomeActionCard(
@@ -144,13 +217,21 @@ class _ScannerHomeActionCard extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: ScannerTheme.panelDecoration(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: ScannerTheme.primary),
-          const SizedBox(height: 10),
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: ScannerTheme.primarySoft,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(icon, color: ScannerTheme.primary),
+          ),
+          const SizedBox(height: 12),
           Text(
             title,
             style: theme.textTheme.titleMedium?.copyWith(
@@ -158,11 +239,22 @@ class _ScannerHomeActionCard extends StatelessWidget {
               fontWeight: FontWeight.w700,
             ),
           ),
-          const SizedBox(height: 4),
-          Expanded(child: Text(description)),
+          const SizedBox(height: 6),
+          Expanded(
+            child: Text(
+              description,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: ScannerTheme.mutedText,
+              ),
+            ),
+          ),
           Align(
             alignment: Alignment.centerRight,
-            child: FilledButton(onPressed: onPressed, child: Text(buttonLabel)),
+            child: FilledButton.icon(
+              onPressed: onPressed,
+              icon: const Icon(Icons.arrow_forward),
+              label: Text(buttonLabel),
+            ),
           ),
         ],
       ),

@@ -272,7 +272,6 @@ class _LoginSubmitButton extends StatelessWidget {
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
                         height: 1.0,
-                        fontFamily: 'Roboto',
                         decoration: TextDecoration.none,
                         decorationColor: Colors.transparent,
                       ),

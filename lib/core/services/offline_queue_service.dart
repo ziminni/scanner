@@ -12,6 +12,8 @@ class OfflineQueueService {
   static const _schoolCacheBoxName = 'offline_school_cache';
   static const _peopleBoxName = 'offline_people_cache';
   static const _activeSchoolYearKey = 'active_school_year';
+  static const _systemSettingsKey = 'system_settings';
+  static const _loggedPeopleLastSyncPrefix = 'logged_people_last_sync_';
 
   OfflineQueueService(this._connectivity);
 
@@ -89,6 +91,41 @@ class OfflineQueueService {
     }).toList()..sort((a, b) => a.timestamp.compareTo(b.timestamp));
   }
 
+  Future<int> pendingLoggedPeopleCount({
+    required String schoolYearId,
+    required PersonRole role,
+  }) async {
+    final attendanceCount = (await loadPendingLogs()).where((log) {
+      return log.schoolYearId == schoolYearId && log.personRole == role;
+    }).length;
+    final gatePassCount = (await loadPendingGatePassLogs()).where((log) {
+      return log.schoolYearId == schoolYearId && log.personRole == role;
+    }).length;
+    return attendanceCount + gatePassCount;
+  }
+
+  Future<void> cacheLoggedPeopleLastSync({
+    required String schoolYearId,
+    required PersonRole role,
+    required DateTime syncedAt,
+  }) async {
+    final key = '$_loggedPeopleLastSyncPrefix$schoolYearId-${role.name}';
+    await (await _schoolCacheBoxInstance()).put(key, {
+      'syncedAt': syncedAt.toIso8601String(),
+    });
+  }
+
+  Future<DateTime?> loadLoggedPeopleLastSync({
+    required String schoolYearId,
+    required PersonRole role,
+  }) async {
+    final key = '$_loggedPeopleLastSyncPrefix$schoolYearId-${role.name}';
+    final decoded = (await _schoolCacheBoxInstance()).get(key);
+    if (decoded == null) return null;
+    final syncedAt = Map<String, dynamic>.from(decoded)['syncedAt'] as String?;
+    return syncedAt == null ? null : DateTime.tryParse(syncedAt);
+  }
+
   Future<void> enqueueGatePass(GatePassLog log) async {
     final box = await _pendingGatePassBox();
     if (box.containsKey(log.id)) return;
@@ -151,6 +188,20 @@ class OfflineQueueService {
     );
   }
 
+  Future<void> cacheSystemSettings(SystemSettings settings) async {
+    await (await _schoolCacheBoxInstance()).put(_systemSettingsKey, {
+      'data': settings.toMap(),
+    });
+  }
+
+  Future<SystemSettings?> loadCachedSystemSettings() async {
+    final decoded = (await _schoolCacheBoxInstance()).get(_systemSettingsKey);
+    if (decoded == null) return null;
+    return SystemSettings.fromMap(
+      Map<String, dynamic>.from(decoded['data'] as Map),
+    );
+  }
+
   Future<void> cachePerson({
     required String schoolYearId,
     required String personId,
@@ -173,6 +224,31 @@ class OfflineQueueService {
       'assignedTimeOut': assignedTimeOut,
       'contactNumber': contactNumber,
     });
+  }
+
+  Future<int> cachedPeopleCount({
+    required String schoolYearId,
+    required String role,
+  }) async {
+    final box = await _peopleBoxInstance();
+    return box.values.where((item) {
+      final data = Map<String, dynamic>.from(item);
+      return data['schoolYearId'] == schoolYearId && data['role'] == role;
+    }).length;
+  }
+
+  Future<void> clearCachedPeople({
+    required String schoolYearId,
+    required String role,
+  }) async {
+    final box = await _peopleBoxInstance();
+    final keys = box.keys.where((key) {
+      final item = box.get(key);
+      if (item == null) return false;
+      final data = Map<String, dynamic>.from(item);
+      return data['schoolYearId'] == schoolYearId && data['role'] == role;
+    }).toList();
+    await box.deleteAll(keys);
   }
 
   Future<Map<String, dynamic>?> findCachedPerson({

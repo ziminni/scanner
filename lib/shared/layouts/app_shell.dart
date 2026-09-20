@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/constants/assets.dart';
 import '../../core/constants/colors.dart';
 import '../../core/constants/enums.dart';
 import '../../core/services/app_controller.dart';
@@ -81,7 +82,6 @@ class AppShell extends StatelessWidget {
       user: user,
       items: items,
       currentPage: currentPage,
-      onLogout: app.logout,
       child: child,
     );
   }
@@ -247,57 +247,18 @@ class AppShell extends StatelessWidget {
   }
 }
 
-class _AdminDesktopShell extends StatefulWidget {
+class _AdminDesktopShell extends StatelessWidget {
   const _AdminDesktopShell({
     required this.user,
     required this.items,
     required this.currentPage,
-    required this.onLogout,
     required this.child,
   });
 
   final AppUser user;
   final List<_NavItem> items;
   final String currentPage;
-  final VoidCallback onLogout;
   final Widget child;
-
-  @override
-  State<_AdminDesktopShell> createState() => _AdminDesktopShellState();
-}
-
-class _AdminDesktopShellState extends State<_AdminDesktopShell> {
-  bool _sidebarCollapsed = false;
-  bool _sidebarContentCollapsed = false;
-  Timer? _sidebarContentTimer;
-
-  @override
-  void dispose() {
-    _sidebarContentTimer?.cancel();
-    super.dispose();
-  }
-
-  void _toggleSidebar() {
-    _sidebarContentTimer?.cancel();
-    if (_sidebarCollapsed) {
-      _openSidebar();
-      return;
-    }
-    setState(() {
-      _sidebarContentCollapsed = true;
-      _sidebarCollapsed = true;
-    });
-  }
-
-  void _openSidebar() {
-    _sidebarContentTimer?.cancel();
-    if (!_sidebarCollapsed && !_sidebarContentCollapsed) return;
-    setState(() => _sidebarCollapsed = false);
-    _sidebarContentTimer = Timer(const Duration(milliseconds: 170), () {
-      if (!mounted) return;
-      setState(() => _sidebarContentCollapsed = false);
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -305,24 +266,23 @@ class _AdminDesktopShellState extends State<_AdminDesktopShell> {
       body: Row(
         children: [
           _AdminSidebar(
-            items: widget.items,
-            currentPage: widget.currentPage,
-            collapsed: _sidebarCollapsed,
-            contentCollapsed: _sidebarContentCollapsed,
+            user: user,
+            items: items,
+            currentPage: currentPage,
+            collapsed: false,
+            contentCollapsed: false,
             onSelected: (pageId) => context.go(AppRoutes.pathForPage(pageId)),
-            onOpenSidebar: _openSidebar,
+            onOpenSidebar: _noOp,
           ),
           Expanded(
             child: Column(
               children: [
                 _ContentHeader(
-                  user: widget.user,
-                  sidebarCollapsed: _sidebarCollapsed,
-                  onToggleSidebar: _toggleSidebar,
-                  onLogout: widget.onLogout,
+                  user: user,
+                  items: items,
+                  currentPage: currentPage,
                 ),
-                const Divider(height: 1, thickness: 1),
-                Expanded(child: widget.child),
+                Expanded(child: child),
               ],
             ),
           ),
@@ -335,149 +295,306 @@ class _AdminDesktopShellState extends State<_AdminDesktopShell> {
 class _ContentHeader extends StatelessWidget {
   const _ContentHeader({
     required this.user,
-    required this.sidebarCollapsed,
-    required this.onToggleSidebar,
-    required this.onLogout,
+    required this.items,
+    required this.currentPage,
   });
 
   final AppUser user;
-  final bool sidebarCollapsed;
-  final VoidCallback onToggleSidebar;
-  final VoidCallback onLogout;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 64,
-      padding: const EdgeInsets.fromLTRB(24, 0, 16, 0),
-      decoration: BoxDecoration(
-        color: Theme.of(context).scaffoldBackgroundColor,
-        border: const Border(bottom: BorderSide(color: Colors.black12)),
-      ),
-      child: Row(
-        children: [
-          _HeaderSidebarToggleButton(
-            collapsed: sidebarCollapsed,
-            onPressed: onToggleSidebar,
-          ),
-          const SizedBox(width: 12),
-          Text(
-            user.role.label,
-            style: Theme.of(
-              context,
-            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
-          ),
-          const Spacer(),
-          _HeaderAccountMenu(user: user, onLogout: onLogout),
-        ],
-      ),
-    );
-  }
-}
-
-class _HeaderAccountMenu extends StatelessWidget {
-  const _HeaderAccountMenu({required this.user, required this.onLogout});
-
-  final AppUser user;
-  final VoidCallback onLogout;
+  final List<_NavItem> items;
+  final String currentPage;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return PopupMenuButton<_HeaderAccountAction>(
-      tooltip: 'Account menu',
-      position: PopupMenuPosition.under,
-      offset: const Offset(0, 8),
-      onSelected: (action) {
-        switch (action) {
-          case _HeaderAccountAction.profile:
-            showDialog<void>(
-              context: context,
-              builder: (_) => _EditableProfileDialog(user: user),
-            );
-          case _HeaderAccountAction.logout:
-            _confirmAndLogout(context);
-        }
-      },
-      itemBuilder: (context) => const [
-        PopupMenuItem(
-          value: _HeaderAccountAction.profile,
-          child: ListTile(
-            leading: Icon(Icons.person_outline),
-            title: Text('Profile'),
-            contentPadding: EdgeInsets.zero,
+    final page = _findNavigationItem(items, currentPage);
+    final pageTitle = page?.label ?? user.role.label;
+    final category = user.role == UserRole.schoolAdministrator
+        ? _schoolAdminCategory(currentPage)
+        : user.role.label;
+    return Container(
+      height: 78,
+      padding: const EdgeInsets.symmetric(horizontal: 26),
+      decoration: BoxDecoration(
+        color: AppColors.adminSurface,
+        border: const Border(bottom: BorderSide(color: AppColors.adminBorder)),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.adminText.withAlpha(9),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
           ),
-        ),
-        PopupMenuDivider(),
-        PopupMenuItem(
-          value: _HeaderAccountAction.logout,
-          child: ListTile(
-            leading: Icon(Icons.logout),
-            title: Text('Logout'),
-            contentPadding: EdgeInsets.zero,
-          ),
-        ),
-      ],
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border.all(color: theme.colorScheme.primary.withAlpha(28)),
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withAlpha(8),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircleAvatar(
-              radius: 20,
-              backgroundColor: theme.colorScheme.primary.withAlpha(38),
-              child: Text(
-                _initials(user.fullName),
-                style: TextStyle(
-                  color: theme.colorScheme.primary,
-                  fontWeight: FontWeight.w800,
+        ],
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final leftWidth = (constraints.maxWidth * .28).clamp(120.0, 260.0);
+          final preferredSearchWidth = (constraints.maxWidth * .38).clamp(
+            120.0,
+            380.0,
+          );
+          final centeredClearance = (constraints.maxWidth - 320).clamp(
+            100.0,
+            380.0,
+          );
+          final searchWidth = preferredSearchWidth < centeredClearance
+              ? preferredSearchWidth
+              : centeredClearance;
+          return Stack(
+            alignment: Alignment.center,
+            children: [
+              Align(
+                alignment: Alignment.centerLeft,
+                child: SizedBox(
+                  width: leftWidth,
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 4,
+                        height: 42,
+                        decoration: BoxDecoration(
+                          color: AppColors.adminAccent,
+                          borderRadius: BorderRadius.circular(99),
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              category.toUpperCase(),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: AppColors.adminAccent,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 1.1,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              pageTitle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.titleLarge?.copyWith(
+                                color: AppColors.adminText,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -.2,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 12),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 220),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    user.fullName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  Text(
-                    user.email,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
+              SizedBox(
+                width: searchWidth,
+                child: _HeaderSearch(items: items),
               ),
-            ),
-            const SizedBox(width: 8),
-            Icon(Icons.keyboard_arrow_down, color: theme.colorScheme.primary),
-          ],
-        ),
+              Align(
+                alignment: Alignment.centerRight,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const _HeaderNotificationsButton(),
+                    const SizedBox(width: 8),
+                    _HeaderIconButton(
+                      tooltip: 'Account settings',
+                      icon: Icons.settings_outlined,
+                      onPressed: () => showDialog<void>(
+                        context: context,
+                        builder: (_) => _EditableProfileDialog(user: user),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    _HeaderAccountMenu(user: user),
+                  ],
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 }
+
+class _HeaderSearch extends StatelessWidget {
+  const _HeaderSearch({required this.items});
+
+  final List<_NavItem> items;
+
+  @override
+  Widget build(BuildContext context) {
+    final pages = _flattenNavigationItems(items);
+    return SizedBox(
+      height: 44,
+      child: SearchAnchor.bar(
+        barHintText: 'Search pages...',
+        barLeading: const Icon(Icons.search_rounded, size: 20),
+        barElevation: const WidgetStatePropertyAll(0),
+        barBackgroundColor: const WidgetStatePropertyAll(
+          AppColors.adminBackground,
+        ),
+        barShape: WidgetStatePropertyAll(
+          RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: const BorderSide(color: AppColors.adminBorder),
+          ),
+        ),
+        suggestionsBuilder: (context, controller) {
+          final query = controller.text.trim().toLowerCase();
+          final matches = pages.where((page) {
+            return query.isEmpty || page.label.toLowerCase().contains(query);
+          }).toList();
+          if (matches.isEmpty) {
+            return const [
+              ListTile(
+                enabled: false,
+                leading: Icon(Icons.search_off_rounded),
+                title: Text('No matching pages'),
+              ),
+            ];
+          }
+          return [
+            for (final page in matches)
+              ListTile(
+                leading: Icon(page.icon, size: 20),
+                title: Text(page.label),
+                onTap: () {
+                  controller.closeView(page.label);
+                  context.go(AppRoutes.pathForPage(page.id));
+                },
+              ),
+          ];
+        },
+      ),
+    );
+  }
+}
+
+List<_NavItem> _flattenNavigationItems(List<_NavItem> items) {
+  return [
+    for (final item in items)
+      if (item.hasChildren) ..._flattenNavigationItems(item.children) else item,
+  ];
+}
+
+class _HeaderNotificationsButton extends StatelessWidget {
+  const _HeaderNotificationsButton();
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<void>(
+      tooltip: 'Notifications',
+      position: PopupMenuPosition.under,
+      offset: const Offset(0, 8),
+      itemBuilder: (context) => const [
+        PopupMenuItem<void>(
+          enabled: false,
+          child: SizedBox(
+            width: 220,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.notifications_none_rounded,
+                  color: AppColors.adminPrimary,
+                ),
+                SizedBox(height: 8),
+                Text(
+                  'No new notifications',
+                  style: TextStyle(
+                    color: AppColors.adminText,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+      child: const _HeaderIconSurface(icon: Icons.notifications_none_rounded),
+    );
+  }
+}
+
+class _HeaderIconButton extends StatelessWidget {
+  const _HeaderIconButton({
+    required this.tooltip,
+    required this.icon,
+    required this.onPressed,
+  });
+
+  final String tooltip;
+  final IconData icon;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(12),
+        child: _HeaderIconSurface(icon: icon),
+      ),
+    );
+  }
+}
+
+class _HeaderIconSurface extends StatelessWidget {
+  const _HeaderIconSurface({required this.icon});
+
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 42,
+      height: 42,
+      decoration: BoxDecoration(
+        color: AppColors.adminBackground,
+        border: Border.all(color: AppColors.adminBorder),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Icon(icon, size: 21, color: AppColors.adminPrimary),
+    );
+  }
+}
+
+_NavItem? _findNavigationItem(List<_NavItem> items, String pageId) {
+  for (final item in items) {
+    if (item.id == pageId && !item.hasChildren) return item;
+    final child = _findNavigationItem(item.children, pageId);
+    if (child != null) return child;
+    if (item.id == pageId) return item;
+  }
+  return null;
+}
+
+String _schoolAdminCategory(String pageId) {
+  if (pageId == AppRoutes.dashboard) return 'Overview';
+  if (pageId == AppRoutes.schoolYears || pageId == AppRoutes.sections) {
+    return 'Academic Setup';
+  }
+  if (pageId == AppRoutes.students || pageId == AppRoutes.teachers) {
+    return 'People';
+  }
+  if (pageId == AppRoutes.logs ||
+      pageId == AppRoutes.gatePassLogs ||
+      pageId == AppRoutes.attendanceStatus ||
+      pageId == AppRoutes.earlyStudents) {
+    return 'Attendance';
+  }
+  if (pageId == AppRoutes.reports) return 'Reporting';
+  return 'School Administration';
+}
+
+void _noOp() {}
 
 enum _HeaderAccountAction { profile, logout }
 
@@ -722,6 +839,7 @@ String _cleanError(String message) {
 
 class _AdminSidebar extends StatelessWidget {
   const _AdminSidebar({
+    required this.user,
     required this.items,
     required this.currentPage,
     required this.collapsed,
@@ -730,6 +848,7 @@ class _AdminSidebar extends StatelessWidget {
     required this.onOpenSidebar,
   });
 
+  final AppUser user;
   final List<_NavItem> items;
   final String currentPage;
   final bool collapsed;
@@ -740,9 +859,12 @@ class _AdminSidebar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.sizeOf(context).width;
-    final expandedWidth = (screenWidth * 0.17).clamp(280.0, 320.0);
+    final expandedWidth = (screenWidth * 0.185).clamp(270.0, 310.0);
     final sidebarWidth = collapsed ? 92.0 : expandedWidth;
     final horizontalPadding = sidebarWidth >= 320 ? 22.0 : 18.0;
+    final schoolAdminGroups = user.role == UserRole.schoolAdministrator
+        ? _schoolAdminSidebarGroups(items)
+        : const <_AdminSidebarGroup>[];
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 220),
@@ -763,7 +885,7 @@ class _AdminSidebar extends StatelessWidget {
       child: Column(
         children: [
           Container(
-            height: 88,
+            height: 78,
             padding: EdgeInsets.symmetric(
               horizontal: contentCollapsed ? 10 : horizontalPadding,
             ),
@@ -771,65 +893,238 @@ class _AdminSidebar extends StatelessWidget {
               border: Border(bottom: BorderSide(color: Colors.white10)),
             ),
             child: contentCollapsed
-                ? const Center(child: _SidebarLogo(size: 46))
-                : Row(
-                    children: [
-                      const _SidebarLogo(size: 54),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Text(
-                              'LEON GARCIA',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w800,
-                                fontSize: 15,
-                              ),
+                ? const Center(child: _SidebarLogo(size: 42))
+                : Center(
+                    child: Transform.translate(
+                      offset: const Offset(-6, 0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const _SidebarLogo(size: 44),
+                          const SizedBox(width: 10),
+                          Flexible(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'LEON GARCIA',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 14,
+                                    fontFamily: AppFonts.cinzel,
+                                  ),
+                                ),
+                                Text(
+                                  'School Monitor',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: AppColors.mint.withAlpha(200),
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ],
                             ),
-                            Text(
-                              'School Monitor',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: AppColors.mint.withAlpha(200),
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
           ),
           Expanded(
-            child: ListView.separated(
+            child: ListView(
               padding: EdgeInsets.fromLTRB(
                 contentCollapsed ? 12 : horizontalPadding * 0.72,
                 22,
                 contentCollapsed ? 12 : horizontalPadding * 0.72,
                 22,
               ),
-              itemCount: items.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 8),
-              itemBuilder: (context, index) {
-                final item = items[index];
-                return _AdminSidebarEntry(
-                  item: item,
-                  currentPage: currentPage,
-                  collapsed: contentCollapsed,
-                  onSelected: onSelected,
-                  onOpenSidebar: onOpenSidebar,
-                  sidebarWidth: sidebarWidth,
-                );
-              },
+              children: schoolAdminGroups.isEmpty
+                  ? [
+                      for (var index = 0; index < items.length; index++) ...[
+                        if (index > 0) const SizedBox(height: 8),
+                        _AdminSidebarEntry(
+                          item: items[index],
+                          currentPage: currentPage,
+                          collapsed: contentCollapsed,
+                          onSelected: onSelected,
+                          onOpenSidebar: onOpenSidebar,
+                          sidebarWidth: sidebarWidth,
+                        ),
+                      ],
+                    ]
+                  : [
+                      for (
+                        var groupIndex = 0;
+                        groupIndex < schoolAdminGroups.length;
+                        groupIndex++
+                      ) ...[
+                        if (groupIndex > 0) const SizedBox(height: 22),
+                        if (!contentCollapsed)
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+                            child: Text(
+                              schoolAdminGroups[groupIndex].label,
+                              style: TextStyle(
+                                color: AppColors.mint.withAlpha(205),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 1.1,
+                              ),
+                            ),
+                          ),
+                        for (
+                          var itemIndex = 0;
+                          itemIndex <
+                              schoolAdminGroups[groupIndex].items.length;
+                          itemIndex++
+                        ) ...[
+                          if (itemIndex > 0) const SizedBox(height: 4),
+                          Padding(
+                            padding: EdgeInsets.only(
+                              left: contentCollapsed ? 0 : 18,
+                            ),
+                            child: _AdminSidebarEntry(
+                              item: schoolAdminGroups[groupIndex]
+                                  .items[itemIndex],
+                              currentPage: currentPage,
+                              collapsed: contentCollapsed,
+                              onSelected: onSelected,
+                              onOpenSidebar: onOpenSidebar,
+                              sidebarWidth: sidebarWidth,
+                              showIcon: false,
+                              bareIcon: true,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  List<_AdminSidebarGroup> _schoolAdminSidebarGroups(List<_NavItem> items) {
+    final navigableItems = <String, _NavItem>{
+      for (final item in items)
+        if (item.hasChildren)
+          for (final child in item.children) child.id: child
+        else
+          item.id: item,
+    };
+
+    List<_NavItem> select(List<String> ids) {
+      return ids.map((id) => navigableItems[id]).whereType<_NavItem>().toList();
+    }
+
+    return [
+      _AdminSidebarGroup('OVERVIEW', select([AppRoutes.dashboard])),
+      _AdminSidebarGroup(
+        'ACADEMIC SETUP',
+        select([AppRoutes.schoolYears, AppRoutes.sections]),
+      ),
+      _AdminSidebarGroup(
+        'PEOPLE',
+        select([AppRoutes.students, AppRoutes.teachers]),
+      ),
+      _AdminSidebarGroup(
+        'ATTENDANCE',
+        select([
+          AppRoutes.logs,
+          AppRoutes.attendanceStatus,
+          AppRoutes.earlyStudents,
+        ]),
+      ),
+      _AdminSidebarGroup('REPORTING', select([AppRoutes.reports])),
+    ];
+  }
+}
+
+class _AdminSidebarGroup {
+  const _AdminSidebarGroup(this.label, this.items);
+
+  final String label;
+  final List<_NavItem> items;
+}
+
+class _HeaderAccountMenu extends StatelessWidget {
+  const _HeaderAccountMenu({required this.user});
+
+  final AppUser user;
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<_HeaderAccountAction>(
+      tooltip: 'Account menu',
+      position: PopupMenuPosition.under,
+      offset: const Offset(0, 8),
+      onSelected: (action) {
+        switch (action) {
+          case _HeaderAccountAction.profile:
+            showDialog<void>(
+              context: context,
+              builder: (_) => _EditableProfileDialog(user: user),
+            );
+          case _HeaderAccountAction.logout:
+            _confirmAndLogout(context);
+        }
+      },
+      itemBuilder: (context) => const [
+        PopupMenuItem(
+          value: _HeaderAccountAction.profile,
+          child: ListTile(
+            leading: Icon(Icons.person_outline),
+            title: Text('Profile'),
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
+        PopupMenuDivider(),
+        PopupMenuItem(
+          value: _HeaderAccountAction.logout,
+          child: ListTile(
+            leading: Icon(Icons.logout),
+            title: Text('Logout'),
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
+      ],
+      child: Container(
+        height: 48,
+        padding: const EdgeInsets.fromLTRB(5, 4, 8, 4),
+        decoration: BoxDecoration(
+          color: AppColors.adminBackground,
+          border: Border.all(color: AppColors.adminBorder),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircleAvatar(
+              radius: 19,
+              backgroundColor: AppColors.adminAccent,
+              child: Text(
+                _initials(user.fullName),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            const SizedBox(width: 5),
+            const Icon(
+              Icons.keyboard_arrow_down_rounded,
+              color: AppColors.adminPrimary,
+              size: 20,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -846,39 +1141,10 @@ class _SidebarLogo extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: Colors.white,
         borderRadius: BorderRadius.circular(size >= 50 ? 12 : 10),
         image: const DecorationImage(
-          image: AssetImage('assets/img/logo.jpg'),
-          fit: BoxFit.cover,
-        ),
-      ),
-    );
-  }
-}
-
-class _HeaderSidebarToggleButton extends StatelessWidget {
-  const _HeaderSidebarToggleButton({
-    required this.collapsed,
-    required this.onPressed,
-  });
-
-  final bool collapsed;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Tooltip(
-      message: collapsed ? 'Open sidebar' : 'Close sidebar',
-      child: IconButton(
-        onPressed: onPressed,
-        icon: Icon(collapsed ? Icons.menu_open : Icons.menu, size: 22),
-        style: IconButton.styleFrom(
-          foregroundColor: theme.colorScheme.primary,
-          backgroundColor: theme.colorScheme.primary.withAlpha(18),
-          hoverColor: theme.colorScheme.primary.withAlpha(30),
-          fixedSize: const Size(40, 40),
+          image: AssetImage(AppAssets.schoolLogo),
+          fit: BoxFit.contain,
         ),
       ),
     );
@@ -893,6 +1159,8 @@ class _AdminSidebarEntry extends StatefulWidget {
     required this.onSelected,
     required this.onOpenSidebar,
     required this.sidebarWidth,
+    this.showIcon = true,
+    this.bareIcon = false,
   });
 
   final _NavItem item;
@@ -901,6 +1169,8 @@ class _AdminSidebarEntry extends StatefulWidget {
   final ValueChanged<String> onSelected;
   final VoidCallback onOpenSidebar;
   final double sidebarWidth;
+  final bool showIcon;
+  final bool bareIcon;
 
   @override
   State<_AdminSidebarEntry> createState() => _AdminSidebarEntryState();
@@ -937,6 +1207,8 @@ class _AdminSidebarEntryState extends State<_AdminSidebarEntry> {
         collapsed: widget.collapsed,
         onTap: () => widget.onSelected(item.id),
         sidebarWidth: widget.sidebarWidth,
+        showIcon: widget.showIcon,
+        bareIcon: widget.bareIcon,
       );
     }
 
@@ -956,6 +1228,8 @@ class _AdminSidebarEntryState extends State<_AdminSidebarEntry> {
           setState(() => _expanded = !_expanded);
         },
         sidebarWidth: widget.sidebarWidth,
+        showIcon: widget.showIcon,
+        bareIcon: widget.bareIcon,
         trailing: widget.collapsed
             ? null
             : Icon(
@@ -983,6 +1257,8 @@ class _AdminSidebarEntryState extends State<_AdminSidebarEntry> {
                             collapsed: false,
                             onTap: () => widget.onSelected(child.id),
                             sidebarWidth: widget.sidebarWidth,
+                            showIcon: widget.showIcon,
+                            bareIcon: widget.bareIcon,
                           ),
                         ),
                     ],
@@ -1013,6 +1289,8 @@ class _AdminSidebarItem extends StatelessWidget {
     required this.collapsed,
     required this.onTap,
     required this.sidebarWidth,
+    this.showIcon = true,
+    this.bareIcon = false,
     this.trailing,
   });
 
@@ -1021,6 +1299,8 @@ class _AdminSidebarItem extends StatelessWidget {
   final bool collapsed;
   final VoidCallback? onTap;
   final double sidebarWidth;
+  final bool showIcon;
+  final bool bareIcon;
   final Widget? trailing;
 
   @override
@@ -1028,7 +1308,6 @@ class _AdminSidebarItem extends StatelessWidget {
     final textColor = selected ? Colors.white : Colors.white.withAlpha(216);
     final iconColor = selected ? Colors.white : Colors.white.withAlpha(179);
     final fontSize = sidebarWidth >= 320 ? 15.0 : 14.0;
-    final iconSize = sidebarWidth >= 320 ? 24.0 : 22.0;
 
     final button = Material(
       color: Colors.transparent,
@@ -1037,7 +1316,7 @@ class _AdminSidebarItem extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         hoverColor: AppColors.adminSidebarActive.withAlpha(184),
         child: Container(
-          height: collapsed ? 56 : 58,
+          height: collapsed ? 56 : (showIcon ? 58 : 42),
           padding: EdgeInsets.symmetric(horizontal: collapsed ? 0 : 14),
           decoration: BoxDecoration(
             color: selected ? AppColors.adminSidebarActive : Colors.transparent,
@@ -1048,23 +1327,40 @@ class _AdminSidebarItem extends StatelessWidget {
                 ? MainAxisAlignment.center
                 : MainAxisAlignment.start,
             children: [
-              Container(
-                width: collapsed ? 46 : 44,
-                height: collapsed ? 46 : 44,
-                decoration: BoxDecoration(
-                  color: selected
-                      ? AppColors.adminAccent
-                      : AppColors.adminSidebarMuted.withAlpha(51),
-                  borderRadius: BorderRadius.circular(10),
+              if (showIcon)
+                Container(
+                  width: collapsed ? 46 : 44,
+                  height: collapsed ? 46 : 44,
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? AppColors.adminAccent
+                        : AppColors.adminSidebarMuted.withAlpha(51),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    selected ? item.selectedIcon : item.icon,
+                    color: iconColor,
+                    size: sidebarWidth >= 320 ? 24 : 22,
+                  ),
                 ),
-                child: Icon(
+              if (bareIcon)
+                Icon(
                   selected ? item.selectedIcon : item.icon,
                   color: iconColor,
-                  size: iconSize,
+                  size: 20,
                 ),
-              ),
+              if (collapsed && !showIcon && !bareIcon)
+                Text(
+                  _sidebarAbbreviation(item.label),
+                  style: TextStyle(
+                    color: textColor,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: .5,
+                  ),
+                ),
               if (!collapsed) ...[
-                const SizedBox(width: 14),
+                if (showIcon || bareIcon) const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     item.label,
@@ -1088,6 +1384,21 @@ class _AdminSidebarItem extends StatelessWidget {
 
     return collapsed ? Tooltip(message: item.label, child: button) : button;
   }
+}
+
+String _sidebarAbbreviation(String label) {
+  final words = label
+      .trim()
+      .split(RegExp(r'\s+'))
+      .where((word) => word.isNotEmpty)
+      .toList();
+  if (words.length > 1) {
+    return words.take(2).map((word) => word[0]).join().toUpperCase();
+  }
+  return label
+      .trim()
+      .substring(0, label.trim().length.clamp(0, 2))
+      .toUpperCase();
 }
 
 class _ScannerShell extends StatelessWidget {
@@ -1198,7 +1509,7 @@ class _ScannerAccountDrawer extends StatelessWidget {
                     children: [
                       ClipOval(
                         child: Image.asset(
-                          'assets/images/school_logo.jpeg',
+                          AppAssets.schoolLogo,
                           width: 52,
                           height: 52,
                           fit: BoxFit.cover,
@@ -1212,6 +1523,7 @@ class _ScannerAccountDrawer extends StatelessWidget {
                             color: ScannerTheme.text,
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
+                            fontFamily: AppFonts.cinzel,
                           ),
                         ),
                       ),
@@ -1414,7 +1726,7 @@ class _ScannerHeaderTitleState extends State<_ScannerHeaderTitle> {
       children: [
         ClipOval(
           child: Image.asset(
-            'assets/images/school_logo.jpeg',
+            AppAssets.schoolLogo,
             width: 36,
             height: 36,
             fit: BoxFit.cover,
@@ -1422,7 +1734,14 @@ class _ScannerHeaderTitleState extends State<_ScannerHeaderTitle> {
         ),
         const SizedBox(width: 10),
         const Flexible(
-          child: Text('Leon Garcia', overflow: TextOverflow.ellipsis),
+          child: Text(
+            'Leon Garcia',
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontFamily: AppFonts.cinzel,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
         ),
         const SizedBox(width: 8),
         Container(
@@ -1470,16 +1789,34 @@ class _NavItem {
       id == pageId || children.any((child) => child.containsPage(pageId));
 }
 
-class ActiveSchoolYearGate extends StatelessWidget {
+class ActiveSchoolYearGate extends StatefulWidget {
   const ActiveSchoolYearGate({super.key, required this.child});
 
   final Widget child;
 
   @override
+  State<ActiveSchoolYearGate> createState() => _ActiveSchoolYearGateState();
+}
+
+class _ActiveSchoolYearGateState extends State<ActiveSchoolYearGate> {
+  Future<SchoolYear?>? _activeSchoolYearFuture;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _activeSchoolYearFuture ??= AppScope.of(
+      context,
+    ).attendance.activeSchoolYear();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final app = AppScope.of(context);
+    final cachedSchoolYear = app.attendance.cachedActiveSchoolYear;
+    if (cachedSchoolYear != null) return widget.child;
+
     return FutureBuilder(
-      future: app.attendance.activeSchoolYear(),
+      future: _activeSchoolYearFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
@@ -1523,7 +1860,7 @@ class ActiveSchoolYearGate extends StatelessWidget {
             ),
           );
         }
-        return child;
+        return widget.child;
       },
     );
   }

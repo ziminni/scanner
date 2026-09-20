@@ -10,6 +10,7 @@ import 'admin_pagination_controls.dart';
 import 'admin_table_footer.dart';
 import 'app_widgets.dart';
 import 'bulk_archive_selection_bar.dart';
+import 'bulk_selection_action.dart';
 import 'counts_cell.dart';
 import 'data_surface.dart';
 import 'full_width_horizontal_table.dart';
@@ -23,15 +24,21 @@ class CollectionTableBody extends StatefulWidget {
     required this.onArchive,
     this.search = '',
     this.filters = const {},
+    this.sortComparator,
     this.confirmArchive = false,
     this.enableBulkArchive = false,
     this.showArchiveAction = true,
     this.teacherTableStyle = false,
     this.itemLabel = 'records',
     this.columnLabels = const {},
+    this.bulkSecondaryActionLabel,
+    this.bulkSecondaryActionIcon,
+    this.bulkSecondaryActions = const [],
+    this.onBulkSecondaryAction,
     required this.initialItemsPerPage,
     this.schoolYearId,
     this.onEdit,
+    this.onDownload,
     this.onBulkArchive,
     this.onRowTap,
   });
@@ -42,12 +49,21 @@ class CollectionTableBody extends StatefulWidget {
   final Future<void> Function(String docId) onArchive;
   final String search;
   final Map<String, String> filters;
+  final int Function(
+    QueryDocumentSnapshot<Map<String, dynamic>> a,
+    QueryDocumentSnapshot<Map<String, dynamic>> b,
+  )?
+  sortComparator;
   final bool confirmArchive;
   final bool enableBulkArchive;
   final bool showArchiveAction;
   final bool teacherTableStyle;
   final String itemLabel;
   final Map<String, String> columnLabels;
+  final String? bulkSecondaryActionLabel;
+  final IconData? bulkSecondaryActionIcon;
+  final List<BulkSelectionAction> bulkSecondaryActions;
+  final Future<bool> Function(List<String> docIds)? onBulkSecondaryAction;
   final int initialItemsPerPage;
   final String? schoolYearId;
   final void Function(
@@ -57,6 +73,13 @@ class CollectionTableBody extends StatefulWidget {
     String? schoolYearId,
   )?
   onEdit;
+  final Future<void> Function(
+    BuildContext context,
+    String docId,
+    Map<String, dynamic> data,
+    String? schoolYearId,
+  )?
+  onDownload;
   final Future<void> Function(List<String> docIds)? onBulkArchive;
   final void Function(
     BuildContext context,
@@ -110,6 +133,8 @@ class CollectionTableBodyState extends State<CollectionTableBody> {
               .toLowerCase()
               .contains(query);
         }).toList();
+        final sortComparator = widget.sortComparator;
+        if (sortComparator != null) docs.sort(sortComparator);
         if (docs.isEmpty) {
           return EmptyState(title: 'No ${widget.collection} records yet');
         }
@@ -139,6 +164,21 @@ class CollectionTableBodyState extends State<CollectionTableBody> {
                   selectedCount: selectedCount,
                   onClear: () => setState(_selectedRecordIds.clear),
                   onArchive: () => _bulkArchiveRecords(context, selectedCount),
+                  secondaryActionLabel: widget.bulkSecondaryActionLabel,
+                  secondaryActionIcon: widget.bulkSecondaryActionIcon,
+                  secondaryMenuItems: [
+                    for (final action in widget.bulkSecondaryActions)
+                      BulkSelectionMenuItem(
+                        label: action.label,
+                        icon: action.icon,
+                        onPressed: () => _runBulkSecondaryAction(
+                          _selectedRecordIds.toList(),
+                          action: action.onSelected,
+                        ),
+                      ),
+                  ],
+                  onSecondaryAction: () =>
+                      _runBulkSecondaryAction(_selectedRecordIds.toList()),
                 ),
                 const SizedBox(height: 12),
               ],
@@ -240,6 +280,17 @@ class CollectionTableBodyState extends State<CollectionTableBody> {
                                       tooltip: 'Edit',
                                       icon: const Icon(Icons.edit_outlined),
                                       onPressed: () => widget.onEdit!(
+                                        context,
+                                        paginatedDocs[index].id,
+                                        paginatedDocs[index].data(),
+                                        widget.schoolYearId,
+                                      ),
+                                    ),
+                                  if (widget.onDownload != null)
+                                    IconButton(
+                                      tooltip: 'Download QR',
+                                      icon: const Icon(Icons.download_outlined),
+                                      onPressed: () => widget.onDownload!(
                                         context,
                                         paginatedDocs[index].id,
                                         paginatedDocs[index].data(),
@@ -441,19 +492,66 @@ class CollectionTableBodyState extends State<CollectionTableBody> {
     if (mounted) setState(_selectedRecordIds.clear);
   }
 
+  Future<void> _runBulkSecondaryAction(
+    List<String> docIds, {
+    Future<bool> Function(List<String> docIds)? action,
+  }) async {
+    action ??= widget.onBulkSecondaryAction;
+    if (action == null || docIds.isEmpty) return;
+    final completed = await action(docIds);
+    if (completed && mounted) setState(_selectedRecordIds.clear);
+  }
+
   bool _matchesFilters(Map<String, dynamic> data, Map<String, String> filters) {
     for (final entry in filters.entries) {
       final selected = entry.value.trim();
       if (selected.isEmpty) continue;
       if (entry.key == 'section' && selected.toLowerCase() == 'unassigned') {
         final rawSection = data[entry.key]?.toString().trim() ?? '';
-        if (rawSection.isNotEmpty) return false;
+        if (rawSection.isNotEmpty && rawSection != '-') return false;
         continue;
       }
-      final value = adminFormatValue(data[entry.key]).trim().toLowerCase();
-      if (value != selected.toLowerCase()) return false;
+      if (entry.key == 'isAral') {
+        final isAral = data['isAral'] as bool? ?? false;
+        if (isAral.toString() != selected.toLowerCase()) return false;
+        continue;
+      }
+      if (entry.key == 'blankFields') {
+        if (selected.toLowerCase() != 'true') continue;
+        if (!_hasBlankDisplayField(data)) return false;
+        continue;
+      }
+      final value = _normalizeFilterValue(adminFormatValue(data[entry.key]));
+      if (value != _normalizeFilterValue(selected)) return false;
     }
     return true;
+  }
+
+  bool _hasBlankDisplayField(Map<String, dynamic> data) {
+    const fields = [
+      'lrn',
+      'lastName',
+      'firstName',
+      'gender',
+      'birthdate',
+      'address',
+      'guardianName',
+      'guardianContact',
+      'section',
+    ];
+    return fields.any((field) {
+      final value = data[field];
+      if (value == null) return true;
+      if (value is String) {
+        final text = value.trim();
+        return text.isEmpty || text == '-';
+      }
+      return false;
+    });
+  }
+
+  String _normalizeFilterValue(String value) {
+    return value.trim().replaceAll(RegExp(r'\s+'), ' ').toLowerCase();
   }
 
   Widget _buildCell(BuildContext context, Object? value, String column) {
@@ -473,8 +571,15 @@ class CollectionTableBodyState extends State<CollectionTableBody> {
       final address = adminFormatValue(value);
       return SizedBox(
         width: 105,
-        child: Text(address, maxLines: 1, overflow: TextOverflow.ellipsis),
+        child: Text(
+          address.toUpperCase(),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
       );
+    }
+    if (lower == 'fullname' || lower == 'guardianname') {
+      return Text(adminFormatValue(value).toUpperCase());
     }
     if (lower.contains('status')) {
       final label = value?.toString() ?? '-';

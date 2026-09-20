@@ -29,13 +29,6 @@ class SystemAdminDashboardPage extends StatelessWidget {
       padding: const EdgeInsets.all(20),
       children: [
         Text(
-          'Comprehensive Dashboard',
-          style: Theme.of(
-            context,
-          ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 4),
-        Text(
           'System health, activity, quick actions, and recent events',
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
             color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -71,8 +64,6 @@ class _SchoolAdminFallbackDashboard extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Text('Dashboard', style: Theme.of(context).textTheme.headlineSmall),
-        const SizedBox(height: 16),
         GridView(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),

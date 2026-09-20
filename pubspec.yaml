@@ -40,10 +40,25 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  fonts:
+    - family: OpenSans
+      fonts:
+        - asset: assets/fonts/OpenSans-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/OpenSans-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/OpenSans-Bold.ttf
+          weight: 700
+    - family: Cinzel
+      fonts:
+        - asset: assets/fonts/Cinzel-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Cinzel-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Cinzel-Bold.ttf
+          weight: 700
   assets:
     - assets/images/
-    - assets/img/logo.jpg
-    - assets/templates/Students-template.xlsx
-    - assets/templates/Students-template-v2.xlsx
-    - assets/templates/Students-template-v3.xlsx
-    - assets/templates/Teachers-template-v2.xlsx
+    - assets/images/logos/school_logo.png
+    - assets/sounds/
+    - assets/templates/

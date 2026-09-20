@@ -285,13 +285,19 @@ class _EditSectionDialogState extends State<_EditSectionDialog> {
       if (schoolYear != null && sectionName.trim().isNotEmpty) {
         final students = await app.repository
             .schoolYearCollection(schoolYear.id, 'students')
-            .where('section', isEqualTo: sectionName)
             .where('archived', isEqualTo: false)
             .get();
 
         var batch = app.firestore.batch();
         var writes = 0;
+        final sectionKey = _normalizedSectionKey(sectionName);
         for (final student in students.docs) {
+          if (_normalizedSectionKey(
+                student.data()['section'] as String? ?? '',
+              ) !=
+              sectionKey) {
+            continue;
+          }
           batch.set(student.reference, {
             'section': '',
             'previousSection': sectionName,

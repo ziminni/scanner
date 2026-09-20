@@ -21,7 +21,7 @@ class _MobileHeader extends StatelessWidget {
               borderRadius: BorderRadius.circular(10),
             ),
             child: Image.asset(
-              'assets/images/school_logo.jpeg',
+              AppAssets.schoolLogo,
               fit: BoxFit.cover,
               errorBuilder: (context, error, stackTrace) => const Icon(
                 Icons.school_outlined,
@@ -39,6 +39,7 @@ class _MobileHeader extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
+                  fontFamily: AppFonts.cinzel,
                   color: AppColors.adminText,
                 ),
               ),

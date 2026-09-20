@@ -210,38 +210,17 @@ class ArchivedRecordsTableState extends State<ArchivedRecordsTable> {
     BuildContext context,
     List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
   ) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Delete selected records?'),
-        content: Text(
-          'This will permanently delete ${docs.length} selected ${widget.collection} records from the archive. This cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton.icon(
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
-              foregroundColor: Theme.of(context).colorScheme.onError,
-            ),
-            icon: const Icon(Icons.delete_outline),
-            label: const Text('Delete'),
-            onPressed: () => Navigator.of(context).pop(true),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !context.mounted) return;
+    final choice = await _showDeleteConfirmation(context, docs.length);
+    if (choice == null || !choice.deleteRecords || !context.mounted) return;
 
     final app = AppScope.of(context);
-    await _commitInBatches(
-      app,
-      docs,
-      (batch, doc) => batch.delete(doc.reference),
-    );
+    final relatedLogRefs = choice.deleteRelatedLogs
+        ? await _relatedLogRefs(app, docs)
+        : <DocumentReference<Map<String, dynamic>>>[];
+    await _commitDeleteRefsInBatches(app, [
+      ...docs.map((doc) => doc.reference),
+      ...relatedLogRefs,
+    ]);
     await app.audit.record(
       action: '${widget.collection}_deleted_from_archive',
       actorId: app.currentUser!.id,
@@ -249,14 +228,132 @@ class ArchivedRecordsTableState extends State<ArchivedRecordsTable> {
       target: '${docs.length} ${widget.collection} records',
       metadata: {
         'recordCount': docs.length,
+        'relatedLogCount': relatedLogRefs.length,
+        'relatedLogsDeleted': choice.deleteRelatedLogs,
         if (widget.schoolYearId != null) 'schoolYearId': widget.schoolYearId,
         if (widget.schoolYearName != null) 'schoolYear': widget.schoolYearName,
       },
     );
     if (!context.mounted) return;
+    final logMessage = relatedLogRefs.isEmpty
+        ? ''
+        : ' ${relatedLogRefs.length} related logs deleted.';
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${docs.length} records permanently deleted.')),
+      SnackBar(
+        content: Text('${docs.length} records permanently deleted.$logMessage'),
+      ),
     );
+  }
+
+  Future<_ArchiveDeleteChoice?> _showDeleteConfirmation(
+    BuildContext context,
+    int recordCount,
+  ) {
+    var deleteRelatedLogs = false;
+    final canDeleteRelatedLogs =
+        widget.schoolYearId != null &&
+        (widget.collection == 'students' || widget.collection == 'teachers');
+
+    return showDialog<_ArchiveDeleteChoice>(
+      context: context,
+      builder: (_) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Delete selected records?'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'This will permanently delete $recordCount selected ${widget.collection} records from the archive. This cannot be undone.',
+              ),
+              if (canDeleteRelatedLogs) ...[
+                const SizedBox(height: 12),
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: deleteRelatedLogs,
+                  title: const Text('Also delete related logs'),
+                  subtitle: const Text(
+                    'Delete attendance and gate pass logs involving the selected records.',
+                  ),
+                  onChanged: (value) {
+                    setDialogState(() => deleteRelatedLogs = value ?? false);
+                  },
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.error,
+                foregroundColor: Theme.of(context).colorScheme.onError,
+              ),
+              icon: const Icon(Icons.delete_outline),
+              label: const Text('Delete'),
+              onPressed: () => Navigator.of(context).pop(
+                _ArchiveDeleteChoice(
+                  deleteRecords: true,
+                  deleteRelatedLogs: canDeleteRelatedLogs && deleteRelatedLogs,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<List<DocumentReference<Map<String, dynamic>>>> _relatedLogRefs(
+    AppController app,
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+  ) async {
+    final schoolYearId = widget.schoolYearId;
+    if (schoolYearId == null) return [];
+    final personIds = docs
+        .map(_personIdForArchiveDoc)
+        .where((id) => id.isNotEmpty)
+        .toSet();
+    final refs = <DocumentReference<Map<String, dynamic>>>[];
+    for (final personId in personIds) {
+      for (final collection in const ['attendance_logs', 'gate_pass_logs']) {
+        final snapshot = await app.repository
+            .schoolYearCollection(schoolYearId, collection)
+            .where('personId', isEqualTo: personId)
+            .get();
+        refs.addAll(snapshot.docs.map((doc) => doc.reference));
+      }
+    }
+    return refs;
+  }
+
+  String _personIdForArchiveDoc(
+    QueryDocumentSnapshot<Map<String, dynamic>> doc,
+  ) {
+    final data = doc.data();
+    if (widget.collection == 'students') {
+      return (data['lrn'] as String? ?? doc.id).trim();
+    }
+    if (widget.collection == 'teachers') {
+      return (data['teacherId'] as String? ?? doc.id).trim();
+    }
+    return '';
+  }
+
+  Future<void> _commitDeleteRefsInBatches(
+    AppController app,
+    List<DocumentReference<Map<String, dynamic>>> refs,
+  ) async {
+    for (var start = 0; start < refs.length; start += 450) {
+      final batch = app.firestore.batch();
+      for (final ref in refs.skip(start).take(450)) {
+        batch.delete(ref);
+      }
+      await batch.commit();
+    }
   }
 
   Future<void> _commitInBatches(
@@ -276,4 +373,14 @@ class ArchivedRecordsTableState extends State<ArchivedRecordsTable> {
       await batch.commit();
     }
   }
+}
+
+class _ArchiveDeleteChoice {
+  const _ArchiveDeleteChoice({
+    required this.deleteRecords,
+    required this.deleteRelatedLogs,
+  });
+
+  final bool deleteRecords;
+  final bool deleteRelatedLogs;
 }

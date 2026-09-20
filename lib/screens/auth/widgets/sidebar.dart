@@ -1,20 +1,18 @@
 part of '../login_screen.dart';
 
 class _Sidebar extends StatelessWidget {
-  static const _campusImagePath = 'assets/images/leon-garcia-campus.jpg';
-
   @override
   Widget build(BuildContext context) {
     return Stack(
       fit: StackFit.expand,
       children: [
         Image.asset(
-          _campusImagePath,
+          AppAssets.schoolCampus,
           fit: BoxFit.cover,
           errorBuilder: (context, error, stackTrace) {
             if (!kIsWeb) return const SizedBox.expand();
             return Image.network(
-              Uri.base.resolve('assets/$_campusImagePath').toString(),
+              Uri.base.resolve('assets/${AppAssets.schoolCampus}').toString(),
               fit: BoxFit.cover,
               errorBuilder: (context, error, stackTrace) =>
                   const SizedBox.expand(),

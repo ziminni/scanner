@@ -3,30 +3,87 @@ part of '../students_page.dart';
 class _StudentsFilterBar extends StatelessWidget {
   const _StudentsFilterBar({
     required this.search,
+    required this.sortFilter,
     required this.sectionFilter,
-    required this.genderFilter,
     required this.sections,
     required this.onSearchChanged,
+    required this.onSortFilterChanged,
     required this.onSectionChanged,
-    required this.onGenderChanged,
   });
 
   final TextEditingController search;
+  final String sortFilter;
   final String sectionFilter;
-  final String genderFilter;
   final List<String> sections;
   final VoidCallback onSearchChanged;
+  final ValueChanged<String> onSortFilterChanged;
   final ValueChanged<String> onSectionChanged;
-  final ValueChanged<String> onGenderChanged;
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final compact = constraints.maxWidth < 760;
-        final searchWidth = compact
-            ? constraints.maxWidth
-            : (constraints.maxWidth - 372).clamp(320.0, 720.0).toDouble();
+        final showSectionFilter = sortFilter == 'section';
+        final showClearSort = sortFilter != 'lastNameAsc';
+        final searchField = TextField(
+          controller: search,
+          decoration: const InputDecoration(
+            prefixIcon: Icon(Icons.search),
+            labelText: 'Search student name, LRN, section',
+          ),
+          onChanged: (_) => onSearchChanged(),
+        );
+        final sortFilterSelect = _FilterSelect(
+          label: 'Sort / Filter',
+          value: sortFilter,
+          options: const {
+            'lastNameAsc': 'Last name A-Z',
+            'lastNameDesc': 'Last name Z-A',
+            'firstNameAsc': 'First name A-Z',
+            'birthdateOldest': 'Birthdate oldest',
+            'birthdateNewest': 'Birthdate newest',
+            'section': 'Section',
+            'genderMale': 'Gender: Male',
+            'genderFemale': 'Gender: Female',
+            'blankFields': 'With blank fields',
+          },
+          onChanged: onSortFilterChanged,
+        );
+        final clearSortButton = Align(
+          alignment: Alignment.centerRight,
+          child: TextButton(
+            onPressed: () => onSortFilterChanged('lastNameAsc'),
+            child: const Text('Clear'),
+          ),
+        );
+        final sectionFilterSelect = _SectionFilterSelect(
+          value: sectionFilter,
+          sections: sections,
+          onChanged: onSectionChanged,
+        );
+
+        if (!compact) {
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: searchField),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  sortFilterSelect,
+                  if (showClearSort) clearSortButton,
+                ],
+              ),
+              if (showSectionFilter) ...[
+                const SizedBox(width: 12),
+                sectionFilterSelect,
+              ],
+            ],
+          );
+        }
+
         return SizedBox(
           width: constraints.maxWidth,
           child: Wrap(
@@ -35,31 +92,15 @@ class _StudentsFilterBar extends StatelessWidget {
             alignment: WrapAlignment.center,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              SizedBox(
-                width: searchWidth,
-                child: TextField(
-                  controller: search,
-                  decoration: const InputDecoration(
-                    prefixIcon: Icon(Icons.search),
-                    labelText: 'Search student name, LRN, section',
-                  ),
-                  onChanged: (_) => onSearchChanged(),
-                ),
+              SizedBox(width: constraints.maxWidth, child: searchField),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  sortFilterSelect,
+                  if (showClearSort) clearSortButton,
+                ],
               ),
-              _FilterSelect(
-                label: 'Section',
-                value: sectionFilter,
-                options: sections,
-                onChanged: onSectionChanged,
-              ),
-              SizedBox(
-                width: 180,
-                child: GenderDropdownField(
-                  value: genderFilter,
-                  includeAll: true,
-                  onChanged: (value) => onGenderChanged(value ?? ''),
-                ),
-              ),
+              if (showSectionFilter) sectionFilterSelect,
             ],
           ),
         );

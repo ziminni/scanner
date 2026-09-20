@@ -21,7 +21,7 @@ class _SidebarHeader extends StatelessWidget {
               borderRadius: BorderRadius.circular(14),
             ),
             child: Image.asset(
-              'assets/images/school_logo.jpeg',
+              AppAssets.schoolLogo,
               fit: BoxFit.cover,
               errorBuilder: (context, error, stackTrace) => const Icon(
                 Icons.school_outlined,
@@ -42,6 +42,7 @@ class _SidebarHeader extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
+                    fontFamily: AppFonts.cinzel,
                     color: Colors.white,
                   ),
                 ),

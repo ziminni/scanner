@@ -129,13 +129,17 @@ class _SectionsByGrade extends StatelessWidget {
     if (schoolYear != null) {
       final students = await app.repository
           .schoolYearCollection(schoolYear.id, 'students')
-          .where('section', isEqualTo: sectionName)
           .where('archived', isEqualTo: false)
           .get();
 
       var batch = app.firestore.batch();
       var writes = 0;
+      final sectionKey = _normalizedSectionKey(sectionName);
       for (final student in students.docs) {
+        if (_normalizedSectionKey(student.data()['section'] as String? ?? '') !=
+            sectionKey) {
+          continue;
+        }
         batch.set(student.reference, {
           'section': '',
           'previousSection': sectionName,
@@ -175,4 +179,8 @@ class _SectionsByGrade extends StatelessWidget {
       ),
     );
   }
+}
+
+String _normalizedSectionKey(String value) {
+  return value.trim().replaceAll(RegExp(r'\s+'), ' ').toLowerCase();
 }

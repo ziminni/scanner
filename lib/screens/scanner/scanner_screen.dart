@@ -72,118 +72,196 @@ class _ScannerScreenState extends State<ScannerScreen> {
         return ColoredBox(
           color: ScannerTheme.background,
           child: ListView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(20),
             children: [
-              SizedBox(
-                width: double.infinity,
-                child: SegmentedButton<ScannerLogMode>(
-                  style: SegmentedButton.styleFrom(
-                    backgroundColor: ScannerTheme.surface,
-                    selectedBackgroundColor: ScannerTheme.primarySoft,
-                    selectedForegroundColor: ScannerTheme.primary,
-                    foregroundColor: ScannerTheme.text,
-                    side: const BorderSide(color: ScannerTheme.border),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: ScannerTheme.panelDecoration(),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Scanner Mode',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: ScannerTheme.text,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
-                  ),
-                  segments: const [
-                    ButtonSegment(
-                      value: ScannerLogMode.attendance,
-                      icon: Icon(Icons.how_to_reg_outlined),
-                      label: Text('Attendance'),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: SegmentedButton<ScannerLogMode>(
+                        style: SegmentedButton.styleFrom(
+                          backgroundColor: ScannerTheme.surfaceSoft,
+                          selectedBackgroundColor: ScannerTheme.primary,
+                          selectedForegroundColor: Colors.white,
+                          foregroundColor: ScannerTheme.text,
+                          side: const BorderSide(color: ScannerTheme.border),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        segments: const [
+                          ButtonSegment(
+                            value: ScannerLogMode.attendance,
+                            icon: Icon(Icons.how_to_reg_outlined),
+                            label: Text('Attendance'),
+                          ),
+                          ButtonSegment(
+                            value: ScannerLogMode.gatePass,
+                            icon: Icon(Icons.meeting_room_outlined),
+                            label: Text('Gate Pass'),
+                          ),
+                        ],
+                        selected: {_viewModel.mode},
+                        onSelectionChanged: (selection) {
+                          _viewModel.selectMode(selection.first);
+                        },
+                      ),
                     ),
-                    ButtonSegment(
-                      value: ScannerLogMode.gatePass,
-                      icon: Icon(Icons.meeting_room_outlined),
-                      label: Text('Gate Pass'),
-                    ),
+                    const SizedBox(height: 14),
+                    _ScannerActionDropdown(viewModel: _viewModel),
                   ],
-                  selected: {_viewModel.mode},
-                  onSelectionChanged: (selection) {
-                    _viewModel.selectMode(selection.first);
-                  },
                 ),
               ),
-              const SizedBox(height: 14),
-              _ScannerActionDropdown(viewModel: _viewModel),
               const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: ScannerTheme.panelDecoration(),
-                child: AspectRatio(
-                  aspectRatio: 3 / 4,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Stack(
-                      fit: StackFit.expand,
+              Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 620),
+                  child: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: ScannerTheme.panelDecoration(),
+                    child: Column(
                       children: [
-                        MobileScanner(
-                          controller: _scannerController,
-                          fit: BoxFit.cover,
-                          placeholderBuilder: (_) => const ColoredBox(
-                            color: Colors.black,
-                            child: Center(child: CircularProgressIndicator()),
-                          ),
-                          errorBuilder: (context, error) => ColoredBox(
-                            color: Colors.black,
-                            child: Center(
-                              child: Padding(
-                                padding: const EdgeInsets.all(16),
-                                child: Text(
-                                  _scannerErrorMessage(error),
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(color: Colors.white),
-                                ),
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.center_focus_strong_outlined,
+                              color: ScannerTheme.primary,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Position the QR code inside the frame',
+                                style: Theme.of(context).textTheme.bodyMedium
+                                    ?.copyWith(
+                                      color: ScannerTheme.mutedText,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                               ),
                             ),
-                          ),
-                          onDetect: (capture) {
-                            final code = capture.barcodes
-                                .map((barcode) => barcode.rawValue?.trim())
-                                .whereType<String>()
-                                .where((value) => value.isNotEmpty)
-                                .firstOrNull;
-                            if (code != null &&
-                                _viewModel.shouldAcceptDetectedCode(code)) {
-                              _submit(code);
-                            }
-                          },
+                          ],
                         ),
-                        IgnorePointer(
-                          child: Center(
-                            child: Container(
-                              width: 180,
-                              height: 300,
-                              decoration: BoxDecoration(
-                                border: Border.all(
-                                  color: Colors.white,
-                                  width: 2,
+                        const SizedBox(height: 10),
+                        AspectRatio(
+                          aspectRatio: 3 / 4,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(18),
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                MobileScanner(
+                                  controller: _scannerController,
+                                  fit: BoxFit.cover,
+                                  placeholderBuilder: (_) => const ColoredBox(
+                                    color: Colors.black,
+                                    child: Center(
+                                      child: CircularProgressIndicator(),
+                                    ),
+                                  ),
+                                  errorBuilder: (context, error) => ColoredBox(
+                                    color: Colors.black,
+                                    child: Center(
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(16),
+                                        child: Text(
+                                          _scannerErrorMessage(error),
+                                          textAlign: TextAlign.center,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  onDetect: (capture) {
+                                    final code = capture.barcodes
+                                        .map(
+                                          (barcode) => barcode.rawValue?.trim(),
+                                        )
+                                        .whereType<String>()
+                                        .where((value) => value.isNotEmpty)
+                                        .firstOrNull;
+                                    if (code != null &&
+                                        _viewModel.shouldAcceptDetectedCode(
+                                          code,
+                                        )) {
+                                      _submit(code);
+                                    }
+                                  },
                                 ),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
+                                DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topCenter,
+                                      end: Alignment.bottomCenter,
+                                      colors: [
+                                        Colors.black.withAlpha(74),
+                                        Colors.transparent,
+                                        Colors.black.withAlpha(74),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                IgnorePointer(
+                                  child: Center(
+                                    child: Container(
+                                      width: 196,
+                                      height: 314,
+                                      decoration: BoxDecoration(
+                                        border: Border.all(
+                                          color: Colors.white,
+                                          width: 3,
+                                        ),
+                                        borderRadius: BorderRadius.circular(22),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: ScannerTheme.primary
+                                                .withAlpha(90),
+                                            blurRadius: 22,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                Positioned(
+                                  right: 12,
+                                  bottom: 12,
+                                  child: Row(
+                                    children: [
+                                      IconButton.filledTonal(
+                                        tooltip: 'Flashlight',
+                                        icon: const Icon(
+                                          Icons.flashlight_on_outlined,
+                                        ),
+                                        onPressed: () =>
+                                            _scannerController.toggleTorch(),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      IconButton.filledTonal(
+                                        tooltip: 'Switch camera',
+                                        icon: const Icon(
+                                          Icons.cameraswitch_outlined,
+                                        ),
+                                        onPressed: () =>
+                                            _scannerController.switchCamera(),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                        ),
-                        Positioned(
-                          right: 8,
-                          bottom: 8,
-                          child: Row(
-                            children: [
-                              IconButton.filledTonal(
-                                tooltip: 'Flashlight',
-                                icon: const Icon(Icons.flashlight_on_outlined),
-                                onPressed: () =>
-                                    _scannerController.toggleTorch(),
-                              ),
-                              const SizedBox(width: 8),
-                              IconButton.filledTonal(
-                                tooltip: 'Switch camera',
-                                icon: const Icon(Icons.cameraswitch_outlined),
-                                onPressed: () =>
-                                    _scannerController.switchCamera(),
-                              ),
-                            ],
                           ),
                         ),
                       ],
@@ -191,24 +269,34 @@ class _ScannerScreenState extends State<ScannerScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 8),
-              if (!_manualEntryVisible)
-                Center(
-                  child: IconButton(
-                    color: ScannerTheme.primary,
-                    tooltip: 'Show manual entry',
-                    icon: const Icon(Icons.keyboard_arrow_down),
-                    onPressed: () {
-                      setState(() => _manualEntryVisible = true);
-                    },
+              const SizedBox(height: 10),
+              Center(
+                child: TextButton.icon(
+                  style: TextButton.styleFrom(
+                    foregroundColor: ScannerTheme.primary,
                   ),
+                  icon: Icon(
+                    _manualEntryVisible
+                        ? Icons.keyboard_arrow_up
+                        : Icons.keyboard_arrow_down,
+                  ),
+                  label: Text(
+                    _manualEntryVisible
+                        ? 'Hide manual entry'
+                        : 'Use manual entry',
+                  ),
+                  onPressed: () {
+                    setState(() => _manualEntryVisible = !_manualEntryVisible);
+                  },
                 ),
+              ),
               AnimatedSwitcher(
                 duration: const Duration(milliseconds: 180),
                 child: _manualEntryVisible
-                    ? Padding(
+                    ? Container(
                         key: const ValueKey('manual-entry'),
-                        padding: const EdgeInsets.only(top: 8),
+                        padding: const EdgeInsets.all(16),
+                        decoration: ScannerTheme.panelDecoration(),
                         child: Column(
                           children: [
                             Row(
@@ -236,15 +324,6 @@ class _ScannerScreenState extends State<ScannerScreen> {
                                       : () => _submit(_manualId.text),
                                 ),
                               ],
-                            ),
-                            const SizedBox(height: 8),
-                            IconButton(
-                              color: ScannerTheme.primary,
-                              tooltip: 'Hide manual entry',
-                              icon: const Icon(Icons.keyboard_arrow_up),
-                              onPressed: () {
-                                setState(() => _manualEntryVisible = false);
-                              },
                             ),
                           ],
                         ),
@@ -495,72 +574,95 @@ class _ScanFeedbackPageState extends State<_ScanFeedbackPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final sectionText = widget.data.sectionText;
-    return SizedBox.expand(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            minHeight: MediaQuery.sizeOf(context).height - 160,
-          ),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 520),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.check_circle,
-                    size: 96,
-                    color: theme.colorScheme.primary,
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    'Scan Recorded',
-                    style: theme.textTheme.headlineMedium,
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    widget.data.fullName,
-                    style: theme.textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    '${widget.data.idLabel}: ${widget.data.personId}',
-                    style: theme.textTheme.titleMedium,
-                    textAlign: TextAlign.center,
-                  ),
-                  if (widget.data.isStudent &&
-                      sectionText.trim().isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      sectionText,
-                      style: theme.textTheme.titleMedium,
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                  const SizedBox(height: 20),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    alignment: WrapAlignment.center,
+    return ColoredBox(
+      color: ScannerTheme.background,
+      child: SizedBox.expand(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: MediaQuery.sizeOf(context).height - 160,
+            ),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 560),
+                child: Container(
+                  padding: const EdgeInsets.all(28),
+                  decoration: ScannerTheme.panelDecoration(),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Chip(label: Text(widget.data.roleLabel)),
-                      Chip(label: Text(widget.data.actionLabel)),
-                      Chip(label: Text(widget.data.statusLabel)),
-                      Chip(label: Text(widget.data.syncLabel)),
+                      Container(
+                        width: 104,
+                        height: 104,
+                        decoration: const BoxDecoration(
+                          color: ScannerTheme.primarySoft,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.check_circle,
+                          size: 72,
+                          color: theme.colorScheme.primary,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      Text(
+                        'Scan Recorded',
+                        style: theme.textTheme.headlineMedium?.copyWith(
+                          color: ScannerTheme.text,
+                          fontWeight: FontWeight.w800,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 20),
+                      Text(
+                        widget.data.fullName,
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        '${widget.data.idLabel}: ${widget.data.personId}',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: ScannerTheme.mutedText,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      if (widget.data.isStudent &&
+                          sectionText.trim().isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          sectionText,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            color: ScannerTheme.primary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                      const SizedBox(height: 20),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        alignment: WrapAlignment.center,
+                        children: [
+                          Chip(label: Text(widget.data.roleLabel)),
+                          Chip(label: Text(widget.data.actionLabel)),
+                          Chip(label: Text(widget.data.statusLabel)),
+                          Chip(label: Text(widget.data.syncLabel)),
+                        ],
+                      ),
+                      const SizedBox(height: 28),
+                      FilledButton.icon(
+                        icon: const Icon(Icons.qr_code_scanner),
+                        label: Text('Scan Another ($_remainingSeconds)'),
+                        onPressed: _finish,
+                      ),
                     ],
                   ),
-                  const SizedBox(height: 28),
-                  FilledButton.icon(
-                    icon: const Icon(Icons.qr_code_scanner),
-                    label: Text('Scan Another ($_remainingSeconds)'),
-                    onPressed: _finish,
-                  ),
-                ],
+                ),
               ),
             ),
           ),

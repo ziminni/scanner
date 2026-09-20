@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../constants/assets.dart';
 import '../constants/colors.dart';
 
 class AppTheme {
@@ -12,6 +13,7 @@ class AppTheme {
     );
 
     return ThemeData(
+      fontFamily: AppFonts.openSans,
       colorScheme: colorScheme.copyWith(
         primary: AppColors.primary,
         surface: Colors.white,
@@ -47,6 +49,7 @@ class AppTheme {
         ),
       ),
       textTheme: Typography.material2021().black.apply(
+        fontFamily: AppFonts.openSans,
         bodyColor: AppColors.dark,
         displayColor: AppColors.dark,
       ),

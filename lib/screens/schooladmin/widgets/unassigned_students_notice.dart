@@ -1,8 +1,9 @@
 part of '../students_page.dart';
 
 class _UnassignedStudentsNotice extends StatelessWidget {
-  const _UnassignedStudentsNotice({required this.onView});
+  const _UnassignedStudentsNotice({required this.isAral, required this.onView});
 
+  final bool isAral;
   final VoidCallback onView;
 
   @override
@@ -22,8 +23,11 @@ class _UnassignedStudentsNotice extends StatelessWidget {
               .snapshots(),
           builder: (context, snapshot) {
             final unassignedCount = (snapshot.data?.docs ?? []).where((doc) {
-              final section = (doc.data()['section'] as String? ?? '').trim();
-              return section.isEmpty;
+              final data = doc.data();
+              final studentIsAral = data['isAral'] as bool? ?? false;
+              if (studentIsAral != isAral) return false;
+              final section = (data['section'] as String? ?? '').trim();
+              return section.isEmpty || section == '-';
             }).length;
             if (unassignedCount == 0) return const SizedBox.shrink();
 

@@ -9,15 +9,32 @@ class _LastScanCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        border: Border.all(color: theme.colorScheme.outlineVariant),
-        borderRadius: BorderRadius.circular(8),
-      ),
+      padding: const EdgeInsets.all(18),
+      decoration: ScannerTheme.panelDecoration(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(log.fullName, style: theme.textTheme.titleLarge),
+          Row(
+            children: [
+              const Icon(Icons.history, color: ScannerTheme.primary),
+              const SizedBox(width: 8),
+              Text(
+                'Last attendance scan',
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: ScannerTheme.mutedText,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            log.fullName,
+            style: theme.textTheme.titleLarge?.copyWith(
+              color: ScannerTheme.text,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
@@ -32,6 +49,9 @@ class _LastScanCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             'Scanned by ${log.scannedBy} on ${log.deviceId} at ${log.timeText}',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: ScannerTheme.mutedText,
+            ),
           ),
         ],
       ),
@@ -48,15 +68,35 @@ class _LastGatePassCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        border: Border.all(color: theme.colorScheme.outlineVariant),
-        borderRadius: BorderRadius.circular(8),
-      ),
+      padding: const EdgeInsets.all(18),
+      decoration: ScannerTheme.panelDecoration(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(log.fullName, style: theme.textTheme.titleLarge),
+          Row(
+            children: [
+              const Icon(
+                Icons.meeting_room_outlined,
+                color: ScannerTheme.primary,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Last gate pass scan',
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: ScannerTheme.mutedText,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            log.fullName,
+            style: theme.textTheme.titleLarge?.copyWith(
+              color: ScannerTheme.text,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
@@ -70,12 +110,20 @@ class _LastGatePassCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          Text('Reason: ${log.reason}'),
+          Text(
+            'Reason: ${log.reason}',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: ScannerTheme.mutedText,
+            ),
+          ),
           const SizedBox(height: 4),
           Text(
             log.returnTime == null
                 ? 'Logged out at ${log.exitTimeText} by ${log.scannedBy}.'
                 : 'Returned at ${log.returnTimeText} after ${log.durationMinutes} minutes.',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: ScannerTheme.mutedText,
+            ),
           ),
         ],
       ),

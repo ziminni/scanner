@@ -93,6 +93,16 @@ service cloud.firestore {
       allow write: if schoolAdmin();
     }
 
+    match /system_settings/{settingId} {
+      allow read: if activeUser();
+      allow create: if schoolAdmin();
+      allow update: if schoolAdmin()
+        || (scanner()
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['teacherScanSmsRecipient']));
+      allow delete: if systemAdmin();
+    }
+
     match /{collection}/{id} {
       allow read, write: if systemAdmin();
     }

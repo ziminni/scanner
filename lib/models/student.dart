@@ -16,6 +16,7 @@ class Student {
     this.guardianContact = '',
     this.section = '',
     this.status = 'Active',
+    this.isAral = false,
     this.archived = false,
   });
 
@@ -31,6 +32,7 @@ class Student {
   final String guardianContact;
   final String section;
   final String status;
+  final bool isAral;
   final bool archived;
 
   String get fullName => [
@@ -54,6 +56,7 @@ class Student {
       guardianContact: data['guardianContact'] as String? ?? '',
       section: data['section'] as String? ?? '',
       status: data['status'] as String? ?? 'Active',
+      isAral: data['isAral'] as bool? ?? false,
       archived: data['archived'] as bool? ?? false,
     );
   }
@@ -70,6 +73,7 @@ class Student {
     'guardianContact': guardianContact,
     'section': section,
     'status': status,
+    'isAral': isAral,
     'archived': archived,
   };
 }

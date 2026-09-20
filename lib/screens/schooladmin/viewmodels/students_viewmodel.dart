@@ -16,6 +16,7 @@ class StudentsViewModel extends BaseViewModel {
   String? selectedSection;
   String? selectedGender;
   DateTime? birthdate;
+  bool isAral = false;
   String? message;
 
   Stream<QuerySnapshot<Map<String, dynamic>>> get sectionsStream =>
@@ -41,6 +42,11 @@ class StudentsViewModel extends BaseViewModel {
 
   void selectGender(String? gender) {
     selectedGender = gender;
+    notifyListeners();
+  }
+
+  void setIsAral(bool value) {
+    isAral = value;
     notifyListeners();
   }
 
@@ -70,6 +76,7 @@ class StudentsViewModel extends BaseViewModel {
         'gender': selectedGender,
         'section': selectedSection,
         'status': 'Active',
+        'isAral': isAral,
         'schoolYearId': schoolYear.id,
         'schoolYear': schoolYear.name,
         'archived': false,
@@ -94,6 +101,130 @@ class StudentsViewModel extends BaseViewModel {
       setBusy(false);
     }
   }
+
+  Future<List<TransferStudentInfo>> loadTransferStudents(
+    List<String> studentIds,
+  ) async {
+    final schoolYear = await _app.attendance.activeSchoolYear();
+    if (schoolYear == null) return [];
+
+    final students = <TransferStudentInfo>[];
+    for (var start = 0; start < studentIds.length; start += 30) {
+      final ids = studentIds.skip(start).take(30).toList();
+      final snapshot = await _app.repository
+          .schoolYearCollection(schoolYear.id, 'students')
+          .where(FieldPath.documentId, whereIn: ids)
+          .get();
+      students.addAll(
+        snapshot.docs.map((doc) {
+          final data = doc.data();
+          return TransferStudentInfo(
+            id: doc.id,
+            name: studentDisplayName(data),
+            lrn: data['lrn']?.toString().trim() ?? '',
+            section: data['section']?.toString().trim() ?? '',
+          );
+        }),
+      );
+    }
+    students.sort(
+      (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+    );
+    return students;
+  }
+
+  Future<void> transferStudentsToSection({
+    required List<String> studentIds,
+    required String section,
+  }) async {
+    final schoolYear = await _app.attendance.activeSchoolYear();
+    if (schoolYear == null) {
+      throw Exception('Create an active school year before transferring.');
+    }
+
+    for (var start = 0; start < studentIds.length; start += 450) {
+      final batch = _app.firestore.batch();
+      for (final studentId in studentIds.skip(start).take(450)) {
+        batch.set(
+          _app.repository
+              .schoolYearCollection(schoolYear.id, 'students')
+              .doc(studentId),
+          {'section': section, 'updatedAt': FieldValue.serverTimestamp()},
+          SetOptions(merge: true),
+        );
+      }
+      await batch.commit();
+    }
+    await _app.audit.record(
+      action: 'students_transferred_section',
+      actorId: _app.currentUser!.id,
+      actorName: _app.currentUser!.fullName,
+      target: '${studentIds.length} students',
+      metadata: {
+        'schoolYear': schoolYear.name,
+        'studentIds': studentIds,
+        'section': section,
+      },
+    );
+  }
+
+  Future<void> transferStudentsAralStatus({
+    required List<String> studentIds,
+    required bool isAral,
+    required String auditAction,
+  }) async {
+    final schoolYear = await _app.attendance.activeSchoolYear();
+    if (schoolYear == null) {
+      throw Exception('Create an active school year before transferring.');
+    }
+
+    for (var start = 0; start < studentIds.length; start += 450) {
+      final batch = _app.firestore.batch();
+      for (final studentId in studentIds.skip(start).take(450)) {
+        batch.set(
+          _app.repository
+              .schoolYearCollection(schoolYear.id, 'students')
+              .doc(studentId),
+          {'isAral': isAral, 'updatedAt': FieldValue.serverTimestamp()},
+          SetOptions(merge: true),
+        );
+      }
+      await batch.commit();
+    }
+    await _app.audit.record(
+      action: auditAction,
+      actorId: _app.currentUser!.id,
+      actorName: _app.currentUser!.fullName,
+      target: '${studentIds.length} students',
+      metadata: {'schoolYear': schoolYear.name, 'studentIds': studentIds},
+    );
+  }
+}
+
+class TransferStudentInfo {
+  const TransferStudentInfo({
+    required this.id,
+    required this.name,
+    required this.lrn,
+    required this.section,
+  });
+
+  final String id;
+  final String name;
+  final String lrn;
+  final String section;
+}
+
+String studentDisplayName(Map<String, dynamic> data) {
+  final fullName = data['fullName']?.toString().trim() ?? '';
+  if (fullName.isNotEmpty) return fullName;
+
+  final lastName = data['lastName']?.toString().trim() ?? '';
+  final firstName = data['firstName']?.toString().trim() ?? '';
+  final middleName = data['middleName']?.toString().trim() ?? '';
+  final middleInitial = middleName.isEmpty ? '' : ' ${middleName[0]}.';
+  final derivedName = '$lastName, $firstName$middleInitial'.trim();
+  return derivedName == ',' ? 'Unnamed student' : derivedName;
 }
 
 const studentFields = [
@@ -120,3 +251,5 @@ const studentTableFields = [
   'guardianContact',
   'section',
 ];
+
+const studentDetailFields = [...studentTableFields, 'isAral'];

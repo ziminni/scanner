@@ -21,19 +21,37 @@ class HomeLeaderboard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Text(
-                'Top 10 Earliest Today',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  color: ScannerTheme.text,
-                  fontWeight: FontWeight.w700,
-                ),
+              padding: const EdgeInsets.fromLTRB(18, 18, 18, 8),
+              child: Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: ScannerTheme.primarySoft,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(
+                      Icons.emoji_events_outlined,
+                      color: ScannerTheme.primary,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Top 10 Earliest Today',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: ScannerTheme.text,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
               ),
             ),
             const TabBar(
               labelColor: ScannerTheme.primary,
-              unselectedLabelColor: ScannerTheme.text,
+              unselectedLabelColor: ScannerTheme.mutedText,
               indicatorColor: ScannerTheme.primary,
+              indicatorSize: TabBarIndicatorSize.tab,
               tabs: [
                 Tab(text: 'Students'),
                 Tab(text: 'Teachers'),
@@ -76,6 +94,13 @@ class _LeaderboardTable extends StatelessWidget {
       scrollDirection: Axis.horizontal,
       child: DataTable(
         headingRowColor: WidgetStateProperty.all(ScannerTheme.surfaceSoft),
+        headingTextStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
+          color: ScannerTheme.text,
+          fontWeight: FontWeight.w800,
+        ),
+        dataTextStyle: Theme.of(
+          context,
+        ).textTheme.bodyMedium?.copyWith(color: ScannerTheme.text),
         columns: const [
           DataColumn(label: Text('#')),
           DataColumn(label: Text('Name')),

@@ -6,6 +6,7 @@ export 'archive_selection_bar.dart';
 export 'archived_records_dialog.dart';
 export 'archived_records_table.dart';
 export 'bulk_archive_selection_bar.dart';
+export 'bulk_selection_action.dart';
 export 'collection_table.dart';
 export 'collection_table_body.dart';
 export 'count_list_item.dart';

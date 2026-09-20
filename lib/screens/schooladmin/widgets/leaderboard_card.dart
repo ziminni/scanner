@@ -31,25 +31,34 @@ class _LeaderboardCardState extends State<_LeaderboardCard>
     final students = widget.performers['students'] ?? [];
     final teachers = widget.performers['teachers'] ?? [];
 
-    return DataSurface(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Top 10 Early',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
+    return RepaintBoundary(
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(18),
+        decoration: _dashboardCardDecoration(context),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const _DashboardCardHeader(
+              title: 'Top 10 Early',
+              subtitle: 'People with the strongest early/on-time streaks.',
+              icon: Icons.emoji_events_outlined,
+            ),
+            const SizedBox(height: 14),
+            Container(
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest.withAlpha(95),
+                borderRadius: BorderRadius.circular(16),
               ),
-              TabBar(
+              child: TabBar(
                 controller: _tabController,
-                isScrollable: true,
+                indicatorSize: TabBarIndicatorSize.tab,
                 labelColor: theme.colorScheme.primary,
                 unselectedLabelColor: theme.colorScheme.onSurfaceVariant,
-                indicatorColor: theme.colorScheme.primary,
+                indicator: BoxDecoration(
+                  color: theme.colorScheme.primary.withAlpha(22),
+                  borderRadius: BorderRadius.circular(14),
+                ),
                 dividerColor: Colors.transparent,
                 tabs: const [
                   Tab(
@@ -62,20 +71,20 @@ class _LeaderboardCardState extends State<_LeaderboardCard>
                   ),
                 ],
               ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            height: 380,
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildLeaderboardTable(students, isStudent: true),
-                _buildLeaderboardTable(teachers, isStudent: false),
-              ],
             ),
-          ),
-        ],
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 360,
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  _buildLeaderboardTable(students, isStudent: true),
+                  _buildLeaderboardTable(teachers, isStudent: false),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -90,51 +99,71 @@ class _LeaderboardCardState extends State<_LeaderboardCard>
 
     final theme = Theme.of(context);
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: SingleChildScrollView(
-        child: DataTable(
-          horizontalMargin: 8,
-          columnSpacing: 16,
-          dataRowMinHeight: 32,
-          dataRowMaxHeight: 32,
-          headingRowHeight: 32,
-          columns: [
-            const DataColumn(
-              label: Text(
-                'Rank',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ),
-            const DataColumn(
-              label: Text('ID', style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
-            const DataColumn(
-              label: Text(
-                'Name',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ),
-            if (isStudent)
-              const DataColumn(
-                label: Text(
-                  'Section',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minWidth: constraints.maxWidth),
+              child: DataTable(
+                headingRowHeight: 40,
+                dataRowMinHeight: 42,
+                dataRowMaxHeight: 48,
+                horizontalMargin: 14,
+                columnSpacing: 18,
+                headingTextStyle: theme.textTheme.labelMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w800,
                 ),
-              ),
-            const DataColumn(
-              label: Text(
-                'Points',
-                style: TextStyle(fontWeight: FontWeight.bold),
+                dataTextStyle: theme.textTheme.bodySmall,
+                decoration: BoxDecoration(
+                  border: Border.all(color: theme.dividerColor.withAlpha(80)),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                columns: [
+                  const DataColumn(label: Text('Rank')),
+                  const DataColumn(label: Text('ID')),
+                  const DataColumn(label: Text('Name')),
+                  if (isStudent) const DataColumn(label: Text('Section')),
+                  const DataColumn(label: Text('Points')),
+                ],
+                rows: [
+                  for (var i = 0; i < list.length; i++)
+                    _buildDataRow(i + 1, list[i], isStudent, theme),
+                ],
               ),
             ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _rankChip(int rank, Color color, FontWeight rankWeight) {
+    final isTopThree = rank <= 3;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      decoration: BoxDecoration(
+        color: isTopThree ? color.withAlpha(25) : Colors.black.withAlpha(5),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (isTopThree) ...[
+            Icon(Icons.emoji_events, color: color, size: 14),
+            const SizedBox(width: 4),
           ],
-          rows: [
-            for (var i = 0; i < list.length; i++) ...[
-              _buildDataRow(i + 1, list[i], isStudent, theme),
-            ],
-          ],
-        ),
+          Text(
+            '$rank',
+            style: TextStyle(
+              color: isTopThree ? color : Colors.grey.shade700,
+              fontWeight: rankWeight,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -147,71 +176,53 @@ class _LeaderboardCardState extends State<_LeaderboardCard>
   ) {
     Color rankColor;
     FontWeight rankWeight = FontWeight.normal;
-    Widget rankWidget;
 
     if (rank == 1) {
-      rankColor = const Color(0xFFD4AF37); // Gold
+      rankColor = const Color(0xFFD4AF37);
       rankWeight = FontWeight.w900;
-      rankWidget = Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.emoji_events, color: rankColor, size: 15),
-          const SizedBox(width: 4),
-          Text(
-            '$rank',
-            style: TextStyle(color: rankColor, fontWeight: rankWeight),
-          ),
-        ],
-      );
     } else if (rank == 2) {
-      rankColor = const Color(0xFFC0C0C0); // Silver
+      rankColor = const Color(0xFFC0C0C0);
       rankWeight = FontWeight.w800;
-      rankWidget = Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.emoji_events, color: rankColor, size: 15),
-          const SizedBox(width: 4),
-          Text(
-            '$rank',
-            style: TextStyle(color: rankColor, fontWeight: rankWeight),
-          ),
-        ],
-      );
     } else if (rank == 3) {
-      rankColor = const Color(0xFFCD7F32); // Bronze
+      rankColor = const Color(0xFFCD7F32);
       rankWeight = FontWeight.w800;
-      rankWidget = Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.emoji_events, color: rankColor, size: 15),
-          const SizedBox(width: 4),
-          Text(
-            '$rank',
-            style: TextStyle(color: rankColor, fontWeight: rankWeight),
-          ),
-        ],
-      );
     } else {
-      rankWidget = Text('$rank', style: const TextStyle(color: Colors.grey));
+      rankColor = Colors.grey.shade700;
     }
 
     return DataRow(
+      color: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.hovered)) {
+          return theme.colorScheme.primary.withAlpha(12);
+        }
+        return rank.isEven ? Colors.black.withAlpha(3) : Colors.transparent;
+      }),
       cells: [
-        DataCell(rankWidget),
+        DataCell(_rankChip(rank, rankColor, rankWeight)),
         DataCell(Text(performer.id)),
         DataCell(
-          Text(
-            performer.name,
-            style: const TextStyle(fontWeight: FontWeight.w600),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 220),
+            child: Text(
+              performer.name,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
           ),
         ),
-        if (isStudent) DataCell(Text(performer.section)),
+        if (isStudent)
+          DataCell(
+            Text(
+              performer.section.trim().isEmpty ? '-' : performer.section,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         DataCell(
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
               color: theme.colorScheme.primary.withAlpha(20),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(999),
             ),
             child: Text(
               '${performer.points} pts',

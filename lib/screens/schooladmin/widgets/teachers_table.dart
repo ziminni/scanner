@@ -267,6 +267,16 @@ class _TeachersTableState extends State<_TeachersTable> {
                                           ),
                                         ),
                                       ),
+                                      IconButton(
+                                        tooltip: 'Download QR',
+                                        icon: const Icon(Icons.download_outlined),
+                                        onPressed: () => _downloadTeacherQr(
+                                          context,
+                                          app,
+                                          schoolYear,
+                                          paginatedDocs[index],
+                                        ),
+                                      ),
                                     ],
                                   ),
                                 ),
@@ -309,6 +319,63 @@ class _TeachersTableState extends State<_TeachersTable> {
         );
       },
     );
+  }
+
+  Future<void> _downloadTeacherQr(
+    BuildContext context,
+    SchoolAdminViewModel app,
+    SchoolYear schoolYear,
+    QueryDocumentSnapshot<Map<String, dynamic>> doc,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final teacher = Teacher.fromDoc(doc);
+
+    try {
+      final bytes = await buildTeacherQrZipInWorker(
+        teachers: [
+          SectionQrWorkerStudent(
+            lrn: teacher.teacherId,
+            lastName: teacher.lastName,
+            firstName: teacher.firstName,
+            middleName: teacher.middleName,
+          ),
+        ],
+      );
+
+      downloadBytes(
+        fileName: '${_safeTeacherFileName(teacher)}.zip',
+        bytes: bytes,
+        mimeType: 'application/zip',
+      );
+
+      await app.audit.record(
+        action: 'teacher_qr_downloaded',
+        actorId: app.currentUser!.id,
+        actorName: app.currentUser!.fullName,
+        target: teacher.fullName,
+        metadata: {
+          'schoolYear': schoolYear.name,
+          'teacherId': teacher.teacherId,
+        },
+      );
+
+      messenger.showSnackBar(
+        SnackBar(content: Text('QR downloaded for ${teacher.fullName}')),
+      );
+    } catch (error) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('Could not download teacher QR: $error')),
+      );
+    }
+  }
+
+  String _safeTeacherFileName(Teacher teacher) {
+    final base = teacher.fullName.trim();
+    if (base.isEmpty) return 'teacher_qr';
+    return base
+        .replaceAll(RegExp(r'[\\/:*?"<>|]'), '')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
   }
 
   void _showTeacherDetails(BuildContext context, Map<String, dynamic> data) {
@@ -524,13 +591,15 @@ int _teacherSort(
   QueryDocumentSnapshot<Map<String, dynamic>> a,
   QueryDocumentSnapshot<Map<String, dynamic>> b,
 ) {
-  final lastCompare = (a.data()['lastName'] as String? ?? '').compareTo(
-    b.data()['lastName'] as String? ?? '',
-  );
+  final lastCompare = (a.data()['lastName'] as String? ?? '')
+      .trim()
+      .toLowerCase()
+      .compareTo((b.data()['lastName'] as String? ?? '').trim().toLowerCase());
   if (lastCompare != 0) return lastCompare;
-  return (a.data()['firstName'] as String? ?? '').compareTo(
-    b.data()['firstName'] as String? ?? '',
-  );
+  return (a.data()['firstName'] as String? ?? '')
+      .trim()
+      .toLowerCase()
+      .compareTo((b.data()['firstName'] as String? ?? '').trim().toLowerCase());
 }
 
 String _teacherName(Map<String, dynamic> data) {

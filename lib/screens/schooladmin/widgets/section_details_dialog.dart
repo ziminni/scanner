@@ -106,16 +106,23 @@ class _SectionDetailsDialogState extends State<_SectionDetailsDialog> {
                   }
 
                   return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                    stream: app.repository.studentsBySectionStream(
-                      schoolYearId: schoolYear.id,
-                      sectionName: sectionName,
-                    ),
+                    stream: app.repository
+                        .schoolYearCollection(schoolYear.id, 'students')
+                        .where('archived', isEqualTo: false)
+                        .snapshots(),
                     builder: (context, snapshot) {
                       final query = _search.text.trim().toLowerCase();
+                      final sectionKey = _normalizedSectionKey(sectionName);
                       final students =
                           (snapshot.data?.docs ?? [])
                               .map((doc) => doc.data())
                               .where((student) {
+                                if (_normalizedSectionKey(
+                                      _text(student['section']),
+                                    ) !=
+                                    sectionKey) {
+                                  return false;
+                                }
                                 final gender = _text(student['gender']);
                                 if (_genderFilter.isNotEmpty &&
                                     gender.toLowerCase() !=

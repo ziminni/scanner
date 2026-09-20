@@ -9,6 +9,14 @@ import 'firebase_options.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  final defaultFlutterErrorHandler = FlutterError.onError;
+  FlutterError.onError = (details) {
+    final message = details.exceptionAsString();
+    if (message.contains('Trying to render a disposed EngineFlutterView')) {
+      return;
+    }
+    defaultFlutterErrorHandler?.call(details);
+  };
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await Hive.initFlutter();
   FirebaseFirestore.instance.settings = const Settings(

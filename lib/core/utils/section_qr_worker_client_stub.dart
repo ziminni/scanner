@@ -6,12 +6,14 @@ class SectionQrWorkerStudent {
     required this.lastName,
     required this.firstName,
     required this.middleName,
+    this.isAral = false,
   });
 
   final String lrn;
   final String lastName;
   final String firstName;
   final String middleName;
+  final bool isAral;
 }
 
 class SectionQrWorkerProgress {

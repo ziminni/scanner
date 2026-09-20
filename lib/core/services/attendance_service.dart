@@ -24,6 +24,13 @@ class AttendanceService {
   final SmsNotificationService _sms;
   final _uuid = const Uuid();
   SchoolYear? _activeSchoolYearCache;
+  SystemSettings? _settingsCache;
+
+  SchoolYear? get cachedActiveSchoolYear {
+    final cached = _activeSchoolYearCache;
+    if (cached == null || cached.isFinished(DateTime.now())) return null;
+    return cached;
+  }
 
   Stream<QuerySnapshot<Map<String, dynamic>>> logsStream({int limit = 200}) {
     return (() async* {
@@ -185,7 +192,10 @@ class AttendanceService {
         duplicateWindowMinutes: settings.duplicateWindowMinutes,
       );
       unawaited(
-        _sms.notifyAttendance(log: log, recipient: person.contactNumber),
+        _sms.notifyAttendance(
+          log: log,
+          recipient: _scanSmsRecipient(person, settings),
+        ),
       );
       return log;
     }
@@ -199,7 +209,12 @@ class AttendanceService {
     }
 
     await _writeLog(log);
-    unawaited(_sms.notifyAttendance(log: log, recipient: person.contactNumber));
+    unawaited(
+      _sms.notifyAttendance(
+        log: log,
+        recipient: _scanSmsRecipient(person, settings),
+      ),
+    );
     return log;
   }
 
@@ -273,14 +288,20 @@ class AttendanceService {
     if (!online) {
       await _queue.enqueueGatePass(log);
       unawaited(
-        _sms.notifyGatePassExit(log: log, recipient: person.contactNumber),
+        _sms.notifyGatePassExit(
+          log: log,
+          recipient: _scanSmsRecipient(person, settings),
+        ),
       );
       return log;
     }
 
     await _writeGatePassLog(log);
     unawaited(
-      _sms.notifyGatePassExit(log: log, recipient: person.contactNumber),
+      _sms.notifyGatePassExit(
+        log: log,
+        recipient: _scanSmsRecipient(person, settings),
+      ),
     );
     return log;
   }
@@ -330,6 +351,7 @@ class AttendanceService {
     if (person == null) {
       throw StateError('No active student or teacher found for ID $personId.');
     }
+    final settings = await loadSettings();
 
     if (!online) {
       final pending = await _queue.findPendingOpenGatePass(
@@ -346,7 +368,7 @@ class AttendanceService {
       unawaited(
         _sms.notifyGatePassReturn(
           log: updated,
-          recipient: person.contactNumber,
+          recipient: _scanSmsRecipient(person, settings),
         ),
       );
       return updated;
@@ -375,7 +397,10 @@ class AttendanceService {
         .doc(log.id)
         .set(updated.toMap(), SetOptions(merge: true));
     unawaited(
-      _sms.notifyGatePassReturn(log: updated, recipient: person.contactNumber),
+      _sms.notifyGatePassReturn(
+        log: updated,
+        recipient: _scanSmsRecipient(person, settings),
+      ),
     );
     await _audit.record(
       action: 'gate_pass_return_logged',
@@ -387,10 +412,19 @@ class AttendanceService {
     return updated;
   }
 
+  String _scanSmsRecipient(_PersonMatch person, SystemSettings settings) {
+    if (person.role == PersonRole.teacher) {
+      final recipient = settings.teacherScanSmsRecipient.trim();
+      return recipient.isNotEmpty ? recipient : person.contactNumber;
+    }
+    return person.contactNumber;
+  }
+
   Future<void> syncPendingLogs() async {
     if (!await _queue.isOnline) return;
     final settings = await loadSettings();
     final pending = await _queue.loadPendingLogs();
+    final syncedRoles = <PersonRole>{};
     for (final log in pending) {
       try {
         if (!await _isDuplicate(
@@ -400,34 +434,67 @@ class AttendanceService {
           await _writeLog(log);
         }
         await _queue.remove(log.id);
+        syncedRoles.add(log.personRole);
       } catch (_) {
         await _queue.markFailed(log.id);
       }
     }
+    await _cacheLoggedPeopleSyncTimes(syncedRoles);
   }
 
   Future<void> syncPendingGatePassLogs() async {
     if (!await _queue.isOnline) return;
     final pending = await _queue.loadPendingGatePassLogs();
+    final syncedRoles = <PersonRole>{};
     for (final log in pending) {
       try {
         await _writeGatePassLog(log);
         await _queue.removeGatePass(log.id);
+        syncedRoles.add(log.personRole);
       } catch (_) {
         // Keep the pending gate pass for the next reconnect attempt.
       }
     }
+    await _cacheLoggedPeopleSyncTimes(syncedRoles);
+  }
+
+  Future<void> _cacheLoggedPeopleSyncTimes(Set<PersonRole> roles) async {
+    if (roles.isEmpty) return;
+    final schoolYear = await activeSchoolYear();
+    if (schoolYear == null) return;
+    final syncedAt = DateTime.now();
+    for (final role in roles) {
+      await _queue.cacheLoggedPeopleLastSync(
+        schoolYearId: schoolYear.id,
+        role: role,
+        syncedAt: syncedAt,
+      );
+    }
   }
 
   Future<SystemSettings> loadSettings() async {
-    final doc = await _firestore
-        .collection('system_settings')
-        .doc('attendance')
-        .get();
-    return SystemSettings.fromMap(doc.data());
+    final cached = _settingsCache;
+    final online = await _queue.isOnline;
+    if (!online) {
+      _settingsCache = cached ?? await _queue.loadCachedSystemSettings();
+      return _settingsCache ?? const SystemSettings();
+    }
+    try {
+      final doc = await _firestore
+          .collection('system_settings')
+          .doc('attendance')
+          .get(const GetOptions(source: Source.server));
+      _settingsCache = SystemSettings.fromMap(doc.data());
+      await _queue.cacheSystemSettings(_settingsCache!);
+    } catch (_) {
+      _settingsCache = cached ?? await _queue.loadCachedSystemSettings();
+    }
+    return _settingsCache ?? const SystemSettings();
   }
 
   Future<void> updateSettings(SystemSettings settings, AppUser actor) async {
+    _settingsCache = settings;
+    await _queue.cacheSystemSettings(settings);
     await _firestore
         .collection('system_settings')
         .doc('attendance')

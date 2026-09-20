@@ -1,7 +1,10 @@
 import 'dart:typed_data';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
+import '../../core/constants/assets.dart';
 import '../../core/utils/download_file.dart';
 import '../../core/utils/section_qr_worker_client.dart';
 import '../../models/models.dart';
@@ -19,45 +22,111 @@ class ReportsExportPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return AdminPage(
       title: 'Reports & Export',
-      child: Wrap(
-        spacing: 16,
-        runSpacing: 16,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: const [
-          _ReportExportCard(
-            title: 'All Attendance Logs',
+          _ExportSection(
+            title: 'Reports',
             description:
-                'Download every attendance scan recorded in the active school year since scanning started.',
-            icon: Icons.fact_check_outlined,
-            reportType: _ReportType.attendance,
-            formats: [_ReportFormat.excel, _ReportFormat.pdf],
+                'Download attendance and gate pass records for the active school year.',
+            children: [
+              _ReportExportCard(
+                title: 'Attendance Logs',
+                description:
+                    'Export every attendance scan, or choose a specific month.',
+                icon: Icons.fact_check_outlined,
+                reportType: _ReportType.attendance,
+                formats: [_ReportFormat.excel, _ReportFormat.pdf],
+              ),
+              _ReportExportCard(
+                title: 'Gate Pass Logs',
+                description:
+                    'Export every gate pass exit and return record, or choose a specific month.',
+                icon: Icons.directions_walk_outlined,
+                reportType: _ReportType.gatePass,
+                formats: [_ReportFormat.excel, _ReportFormat.pdf],
+              ),
+            ],
           ),
-          _ReportExportCard(
-            title: 'All Gate Pass Logs',
+          SizedBox(height: 24),
+          _ExportSection(
+            title: 'Templates & QR',
             description:
-                'Download every gate pass exit and return record from the active school year.',
-            icon: Icons.directions_walk_outlined,
-            reportType: _ReportType.gatePass,
-            formats: [_ReportFormat.excel, _ReportFormat.pdf],
+                'Get import templates and QR assets used by school admin workflows.',
+            children: [
+              _TemplateDownloadCard(
+                title: 'Student Import Template',
+                description:
+                    'Download the spreadsheet template for bulk importing students.',
+                icon: Icons.school_outlined,
+                fileName: 'Students-template.xlsx',
+                assetPath: AppAssets.studentImportTemplate,
+              ),
+              _TemplateDownloadCard(
+                title: 'Teacher Import Template',
+                description:
+                    'Download the spreadsheet template for bulk importing teachers.',
+                icon: Icons.badge_outlined,
+                fileName: 'Teachers-template.xlsx',
+                assetPath: AppAssets.teacherImportTemplate,
+              ),
+              _TeacherQrDownloadCard(),
+            ],
           ),
-          _TemplateDownloadCard(
-            title: 'Student Import Template',
-            description:
-                'Download the spreadsheet template for bulk importing students.',
-            icon: Icons.school_outlined,
-            fileName: 'Students-template.xlsx',
-            assetPath: 'assets/templates/Students-template-v3.xlsx',
-          ),
-          _TemplateDownloadCard(
-            title: 'Teacher Import Template',
-            description:
-                'Download the spreadsheet template for bulk importing teachers.',
-            icon: Icons.badge_outlined,
-            fileName: 'Teachers-template.xlsx',
-            assetPath: 'assets/templates/Teachers-template-v2.xlsx',
-          ),
-          _TeacherQrDownloadCard(),
         ],
       ),
+    );
+  }
+}
+
+class _ExportSection extends StatelessWidget {
+  const _ExportSection({
+    required this.title,
+    required this.description,
+    required this.children,
+  });
+
+  final String title;
+  final String description;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          description,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 14),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final wide = constraints.maxWidth >= 900;
+            final cardWidth = wide
+                ? ((constraints.maxWidth - 16) / 2).floorToDouble()
+                : constraints.maxWidth;
+            return Wrap(
+              spacing: 16,
+              runSpacing: 16,
+              children: [
+                for (final child in children)
+                  SizedBox(width: cardWidth, child: child),
+              ],
+            );
+          },
+        ),
+      ],
     );
   }
 }

@@ -107,9 +107,32 @@ class _ImportStudentsDialogState extends State<_ImportStudentsDialog> {
                     'Required file type: .xlsx',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
-                  if (_viewModel.importedCount > 0) ...[
+                  if (_viewModel.successMessage != null) ...[
                     const SizedBox(height: 12),
-                    Text('${_viewModel.importedCount} students imported.'),
+                    Text(
+                      _viewModel.successMessage!,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                  if (_viewModel.warnings.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    for (final warning in _viewModel.warnings.take(5))
+                      Text(
+                        warning,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.tertiary,
+                        ),
+                      ),
+                    if (_viewModel.warnings.length > 5)
+                      Text(
+                        '${_viewModel.warnings.length - 5} more warnings.',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.tertiary,
+                        ),
+                      ),
                   ],
                   if (_viewModel.error != null) ...[
                     const SizedBox(height: 12),
@@ -143,12 +166,7 @@ class _ImportStudentsDialogState extends State<_ImportStudentsDialog> {
                       !_viewModel.hasFile ||
                       _viewModel.selectedSection == null
                   ? null
-                  : () async {
-                      final imported = await _viewModel.importStudents();
-                      if (imported && context.mounted) {
-                        Navigator.pop(context);
-                      }
-                    },
+                  : _viewModel.importStudents,
             ),
           ],
         );

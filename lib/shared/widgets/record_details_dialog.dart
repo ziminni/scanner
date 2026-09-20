@@ -36,6 +36,8 @@ class RecordDetailsDialog extends StatelessWidget {
                         child: Text(
                           column == 'fullName'
                               ? 'Full Name'
+                              : column == 'isAral'
+                              ? 'ARAL'
                               : adminLabel(column),
                           style: theme.textTheme.labelLarge?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
@@ -47,7 +49,11 @@ class RecordDetailsDialog extends StatelessWidget {
                       Expanded(
                         child: Text(
                           column == 'fullName'
-                              ? adminPersonName(data)
+                              ? adminPersonName(data).toUpperCase()
+                              : column == 'guardianName' || column == 'address'
+                              ? adminFormatValue(data[column]).toUpperCase()
+                              : data[column] is bool
+                              ? (data[column] as bool ? 'Yes' : 'No')
                               : adminFormatValue(data[column]),
                         ),
                       ),

@@ -133,6 +133,14 @@ class _AddStudentDialogState extends State<_AddStudentDialog> {
                             ? null
                             : _viewModel.selectSection,
                       ),
+                      CheckboxListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('Part of ARAL'),
+                        value: _viewModel.isAral,
+                        onChanged: _viewModel.busy
+                            ? null
+                            : (value) => _viewModel.setIsAral(value ?? false),
+                      ),
                       if (sectionNames.isEmpty)
                         Padding(
                           padding: const EdgeInsets.only(top: 12),

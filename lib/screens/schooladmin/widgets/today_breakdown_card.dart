@@ -39,7 +39,7 @@ class _TodayBreakdownCard extends StatelessWidget {
     Widget buildBar(String label, int count, Color color) {
       final percentage = presentTotal == 0 ? 0.0 : count / presentTotal;
       return Padding(
-        padding: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.only(bottom: 14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -59,7 +59,7 @@ class _TodayBreakdownCard extends StatelessWidget {
                     const SizedBox(width: 8),
                     Text(
                       label,
-                      style: const TextStyle(fontWeight: FontWeight.w700),
+                      style: const TextStyle(fontWeight: FontWeight.w800),
                     ),
                   ],
                 ),
@@ -72,14 +72,14 @@ class _TodayBreakdownCard extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             ClipRRect(
-              borderRadius: BorderRadius.circular(4),
+              borderRadius: BorderRadius.circular(999),
               child: LinearProgressIndicator(
                 value: percentage,
                 backgroundColor: color.withAlpha(25),
                 valueColor: AlwaysStoppedAnimation<Color>(color),
-                minHeight: 8,
+                minHeight: 9,
               ),
             ),
           ],
@@ -87,40 +87,38 @@ class _TodayBreakdownCard extends StatelessWidget {
       );
     }
 
-    return DataSurface(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                "Today's Attendance Status Breakdown",
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              Icon(Icons.analytics_outlined, color: theme.colorScheme.primary),
-            ],
-          ),
-          const SizedBox(height: 16),
-          if (presentTotal == 0)
-            const SizedBox(
-              height: 180,
-              child: Center(
-                child: Text('No check-in logs recorded for today yet.'),
-              ),
-            )
-          else
-            Column(
-              children: [
-                buildBar('Early', early, const Color(0xFF10B981)),
-                buildBar('On Time', onTime, const Color(0xFF3B82F6)),
-                buildBar('Late', lateCount, const Color(0xFFF59E0B)),
-                buildBar('Absent', absent, const Color(0xFFEF4444)),
-              ],
+    return RepaintBoundary(
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(18),
+        decoration: _dashboardCardDecoration(context),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const _DashboardCardHeader(
+              title: "Today's Attendance",
+              subtitle: 'Check-in status breakdown for today.',
+              icon: Icons.analytics_outlined,
             ),
-        ],
+            const SizedBox(height: 18),
+            if (presentTotal == 0)
+              const SizedBox(
+                height: 184,
+                child: Center(
+                  child: Text('No check-in logs recorded for today yet.'),
+                ),
+              )
+            else
+              Column(
+                children: [
+                  buildBar('Early', early, const Color(0xFF10B981)),
+                  buildBar('On Time', onTime, const Color(0xFF3B82F6)),
+                  buildBar('Late', lateCount, const Color(0xFFF59E0B)),
+                  buildBar('Absent', absent, const Color(0xFFEF4444)),
+                ],
+              ),
+          ],
+        ),
       ),
     );
   }

@@ -24,15 +24,25 @@ class SectionQrExporter {
 
     final snapshot = await _app.repository
         .schoolYearCollection(schoolYear.id, 'students')
-        .where('section', isEqualTo: sectionName)
         .where('archived', isEqualTo: false)
         .get();
-    final students = snapshot.docs.map(Student.fromDoc).toList()
-      ..sort((a, b) {
-        final lastCompare = a.lastName.compareTo(b.lastName);
-        if (lastCompare != 0) return lastCompare;
-        return a.firstName.compareTo(b.firstName);
-      });
+    final sectionKey = _normalizedSectionKey(sectionName);
+    final students =
+        snapshot.docs
+            .where(
+              (doc) =>
+                  _normalizedSectionKey(
+                    doc.data()['section'] as String? ?? '',
+                  ) ==
+                  sectionKey,
+            )
+            .map(Student.fromDoc)
+            .toList()
+          ..sort((a, b) {
+            final lastCompare = a.lastName.compareTo(b.lastName);
+            if (lastCompare != 0) return lastCompare;
+            return a.firstName.compareTo(b.firstName);
+          });
 
     if (students.isEmpty) {
       throw Exception('No active students found in $sectionName.');
@@ -48,6 +58,7 @@ class SectionQrExporter {
             lastName: student.lastName,
             firstName: student.firstName,
             middleName: student.middleName,
+            isAral: student.isAral,
           ),
       ],
       onProgress: (progress) {

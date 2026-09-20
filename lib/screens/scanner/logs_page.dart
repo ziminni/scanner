@@ -30,44 +30,75 @@ class _ScannerLogsPageState extends State<ScannerLogsPage> {
       child: ColoredBox(
         color: ScannerTheme.background,
         child: ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(20),
           children: [
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(18),
               decoration: ScannerTheme.panelDecoration(),
-              child: TextField(
-                controller: _search,
-                decoration: const InputDecoration(
-                  prefixIcon: Icon(Icons.search),
-                  labelText: 'Search name',
-                ),
-                onChanged: (_) => setState(() {}),
-              ),
-            ),
-            const SizedBox(height: 12),
-            const TabBar(
-              labelColor: ScannerTheme.primary,
-              indicatorColor: ScannerTheme.primary,
-              tabs: [
-                Tab(text: 'Attendance'),
-                Tab(text: 'Gate Pass'),
-              ],
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              height: MediaQuery.sizeOf(context).height - 250,
-              child: TabBarView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  SingleChildScrollView(
-                    child: _ScannerAttendanceLogsTable(
-                      limit: 200,
-                      search: _search.text,
+                  Text(
+                    'Scanner Logs',
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      color: ScannerTheme.text,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
-                  SingleChildScrollView(
-                    child: _ScannerGatePassLogsTable(
-                      limit: 200,
-                      search: _search.text,
+                  const SizedBox(height: 6),
+                  Text(
+                    'Review recent attendance and gate pass activity.',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: ScannerTheme.mutedText,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: _search,
+                    decoration: const InputDecoration(
+                      prefixIcon: Icon(Icons.search),
+                      labelText: 'Search name',
+                    ),
+                    onChanged: (_) => setState(() {}),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              decoration: ScannerTheme.panelDecoration(),
+              clipBehavior: Clip.antiAlias,
+              child: Column(
+                children: [
+                  const TabBar(
+                    labelColor: ScannerTheme.primary,
+                    unselectedLabelColor: ScannerTheme.mutedText,
+                    indicatorColor: ScannerTheme.primary,
+                    indicatorSize: TabBarIndicatorSize.tab,
+                    tabs: [
+                      Tab(text: 'Attendance'),
+                      Tab(text: 'Gate Pass'),
+                    ],
+                  ),
+                  SizedBox(
+                    height: (MediaQuery.sizeOf(context).height - 300)
+                        .clamp(320.0, 620.0)
+                        .toDouble(),
+                    child: TabBarView(
+                      children: [
+                        SingleChildScrollView(
+                          child: _ScannerAttendanceLogsTable(
+                            limit: 200,
+                            search: _search.text,
+                          ),
+                        ),
+                        SingleChildScrollView(
+                          child: _ScannerGatePassLogsTable(
+                            limit: 200,
+                            search: _search.text,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -233,11 +264,13 @@ class _ScannerTableSurface extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      margin: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: ScannerTheme.surface,
         border: Border.all(color: ScannerTheme.border),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(16),
       ),
+      clipBehavior: Clip.antiAlias,
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: child,

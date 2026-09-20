@@ -111,12 +111,23 @@ class _SectionCard extends StatelessWidget {
                     }
 
                     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                      stream: app.repository.studentsBySectionStream(
-                        schoolYearId: schoolYear.id,
-                        sectionName: name,
-                      ),
+                      stream: app.repository
+                          .schoolYearCollection(schoolYear.id, 'students')
+                          .where('archived', isEqualTo: false)
+                          .snapshots(),
                       builder: (context, snapshot) {
-                        final count = snapshot.data?.docs.length ?? 0;
+                        final sectionKey = _normalizedSectionKey(name);
+                        final count =
+                            snapshot.data?.docs
+                                .where(
+                                  (doc) =>
+                                      _normalizedSectionKey(
+                                        doc.data()['section'] as String? ?? '',
+                                      ) ==
+                                      sectionKey,
+                                )
+                                .length ??
+                            0;
                         return _CardLine(
                           icon: Icons.groups_outlined,
                           value:
