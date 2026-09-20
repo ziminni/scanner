@@ -896,7 +896,7 @@ class _AdminSidebar extends StatelessWidget {
                 ? const Center(child: _SidebarLogo(size: 42))
                 : Center(
                     child: Transform.translate(
-                      offset: const Offset(-6, 0),
+                      offset: const Offset(-10, 0),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         mainAxisSize: MainAxisSize.min,
