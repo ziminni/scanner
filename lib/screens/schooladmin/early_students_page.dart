@@ -4,7 +4,6 @@ import 'package:intl/intl.dart';
 import '../../core/constants/enums.dart';
 import '../../shared/widgets/admin.dart';
 import '../../shared/widgets/app_widgets.dart';
-import '../../shared/widgets/loading_widget.dart';
 import 'viewmodels/early_students_viewmodel.dart';
 import 'viewmodels/school_admin_viewmodel.dart';
 
@@ -119,7 +118,7 @@ class _EarlyStudentsPageState extends State<EarlyStudentsPage> {
               ),
               const SizedBox(height: 12),
               if (_viewModel.busy)
-                const LoadingWidget()
+                const AdminTableSkeleton(columns: 8)
               else if (_viewModel.error != null)
                 EmptyState(title: _viewModel.error!)
               else if (_viewModel.entries.isEmpty)

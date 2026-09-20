@@ -14,11 +14,12 @@ class _SchoolYearMeta extends StatelessWidget {
       future: _SYCounts.load(app.app, schoolYear.id),
       builder: (context, snapshot) {
         final counts = snapshot.data;
-        return Row(
-          mainAxisSize: MainAxisSize.min,
+        return Wrap(
+          spacing: 10,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             _StatusPill(status: schoolYear.displayStatus),
-            const SizedBox(width: 10),
             if (counts == null)
               SizedBox(
                 width: 14,
@@ -30,7 +31,7 @@ class _SchoolYearMeta extends StatelessWidget {
               )
             else
               Text(
-                '${counts.enrollments} enrollments · ${counts.sections} sections',
+                '${counts.students} students  ·  ${counts.teachers} teachers  ·  ${counts.sections} sections',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                   fontWeight: FontWeight.w500,

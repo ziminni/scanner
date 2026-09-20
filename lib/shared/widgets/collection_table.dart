@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/services/app_controller.dart';
 import 'app_widgets.dart';
+import 'admin_table_skeleton.dart';
 import 'bulk_selection_action.dart';
 import 'collection_table_body.dart';
 
@@ -83,6 +84,9 @@ class CollectionTable extends StatelessWidget {
       return FutureBuilder(
         future: app.attendance.activeSchoolYear(),
         builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return AdminTableSkeleton(columns: columns.length + 2);
+          }
           final schoolYear = snapshot.data;
           if (schoolYear == null) {
             return const EmptyState(

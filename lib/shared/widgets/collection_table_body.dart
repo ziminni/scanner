@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import 'admin_formatters.dart';
 import 'admin_pagination_controls.dart';
 import 'admin_table_footer.dart';
+import 'admin_table_skeleton.dart';
 import 'app_widgets.dart';
 import 'bulk_archive_selection_bar.dart';
 import 'bulk_selection_action.dart';
@@ -121,6 +122,11 @@ class CollectionTableBodyState extends State<CollectionTableBody> {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: widget.stream,
       builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return AdminTableSkeleton(
+            columns: widget.columns.length + (widget.enableBulkArchive ? 3 : 2),
+          );
+        }
         final query = widget.search.trim().toLowerCase();
         final docs = (snapshot.data?.docs ?? []).where((doc) {
           final data = doc.data();

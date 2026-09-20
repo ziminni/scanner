@@ -48,6 +48,9 @@ class _TeachersTableState extends State<_TeachersTable> {
     return FutureBuilder(
       future: app.attendance.activeSchoolYear(),
       builder: (context, schoolYearSnapshot) {
+        if (schoolYearSnapshot.connectionState == ConnectionState.waiting) {
+          return const AdminTableSkeleton(columns: 10);
+        }
         final schoolYear = schoolYearSnapshot.data;
         if (schoolYear == null) {
           return const EmptyState(title: 'Create an active school year first');
@@ -59,6 +62,9 @@ class _TeachersTableState extends State<_TeachersTable> {
               .where('archived', isEqualTo: false)
               .snapshots(),
           builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const AdminTableSkeleton(columns: 10);
+            }
             final query = widget.search.trim().toLowerCase();
             final docs = (snapshot.data?.docs ?? []).where((doc) {
               final data = doc.data();
@@ -269,7 +275,9 @@ class _TeachersTableState extends State<_TeachersTable> {
                                       ),
                                       IconButton(
                                         tooltip: 'Download QR',
-                                        icon: const Icon(Icons.download_outlined),
+                                        icon: const Icon(
+                                          Icons.download_outlined,
+                                        ),
                                         onPressed: () => _downloadTeacherQr(
                                           context,
                                           app,

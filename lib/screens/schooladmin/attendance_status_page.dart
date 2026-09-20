@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../shared/widgets/admin.dart';
 import '../../shared/widgets/app_widgets.dart';
-import '../../shared/widgets/loading_widget.dart';
 import 'viewmodels/attendance_status_viewmodel.dart';
 import '../../core/constants/enums.dart';
 import 'viewmodels/school_admin_viewmodel.dart';
@@ -140,7 +139,7 @@ class _AttendanceStatusPageState extends State<AttendanceStatusPage> {
               ),
               const SizedBox(height: 12),
               if (_viewModel.busy)
-                const LoadingWidget()
+                const AdminTableSkeleton(columns: 9)
               else if (_viewModel.error != null)
                 EmptyState(title: _viewModel.error!)
               else if (_viewModel.entries.isEmpty)

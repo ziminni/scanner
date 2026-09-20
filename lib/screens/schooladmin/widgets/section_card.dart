@@ -3,188 +3,113 @@ part of '../sections_page.dart';
 class _SectionCard extends StatelessWidget {
   const _SectionCard({
     required this.data,
+    required this.studentCount,
+    required this.selected,
+    required this.onSelected,
     required this.onOpen,
-    required this.onEdit,
-    required this.onArchive,
   });
 
   final Map<String, dynamic> data;
+  final int studentCount;
+  final bool selected;
+  final ValueChanged<bool> onSelected;
   final VoidCallback onOpen;
-  final VoidCallback onEdit;
-  final VoidCallback onArchive;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final name = data['name'] as String? ?? 'Untitled section';
-    final gradeLevel = data['gradeLevel'] as String? ?? '';
-    final gradeText = gradeLevel.trim().isEmpty
-        ? '-'
-        : gradeLevel.trim().toLowerCase().startsWith('grade')
-        ? gradeLevel
-        : 'Grade $gradeLevel';
-    final app = SchoolAdminViewModelScope.of(context);
 
-    return SizedBox(
-      width: 260,
-      child: Material(
-        color: theme.colorScheme.surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-          side: BorderSide(color: theme.colorScheme.outlineVariant),
-        ),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(8),
-          onTap: onOpen,
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    return InkWell(
+      onTap: onOpen,
+      borderRadius: BorderRadius.circular(10),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 13),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final compact = constraints.maxWidth < 680;
+            final identity = Row(
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        name,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    PopupMenuButton<_SectionCardAction>(
-                      tooltip: 'Section actions',
-                      icon: const Icon(Icons.more_vert),
-                      onSelected: (action) {
-                        switch (action) {
-                          case _SectionCardAction.edit:
-                            onEdit();
-                          case _SectionCardAction.archive:
-                            onArchive();
-                          case _SectionCardAction.downloadQr:
-                            _downloadStudentQrZip(context, data);
-                        }
-                      },
-                      itemBuilder: (context) => [
-                        const PopupMenuItem(
-                          value: _SectionCardAction.downloadQr,
-                          child: ListTile(
-                            dense: true,
-                            leading: Icon(Icons.qr_code_2_outlined),
-                            title: Text('Download Students QR'),
-                          ),
-                        ),
-                        PopupMenuItem(
-                          value: _SectionCardAction.edit,
-                          child: ListTile(
-                            dense: true,
-                            leading: Icon(Icons.edit_outlined),
-                            title: Text('Edit details'),
-                          ),
-                        ),
-                        PopupMenuItem(
-                          value: _SectionCardAction.archive,
-                          child: ListTile(
-                            dense: true,
-                            leading: Icon(Icons.archive_outlined),
-                            title: Text('Archive section'),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                Checkbox(
+                  value: selected,
+                  onChanged: (value) => onSelected(value == true),
                 ),
-                const SizedBox(height: 8),
-                _CardLine(icon: Icons.school_outlined, value: gradeText),
-                const SizedBox(height: 6),
-                _SectionAdviserLine(section: data),
-                const SizedBox(height: 6),
-                FutureBuilder(
-                  future: app.attendance.activeSchoolYear(),
-                  builder: (context, schoolYearSnapshot) {
-                    final schoolYear = schoolYearSnapshot.data;
-                    if (schoolYear == null || name.trim().isEmpty) {
-                      return const _CardLine(
-                        icon: Icons.groups_outlined,
-                        value: '0 students',
-                      );
-                    }
-
-                    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                      stream: app.repository
-                          .schoolYearCollection(schoolYear.id, 'students')
-                          .where('archived', isEqualTo: false)
-                          .snapshots(),
-                      builder: (context, snapshot) {
-                        final sectionKey = _normalizedSectionKey(name);
-                        final count =
-                            snapshot.data?.docs
-                                .where(
-                                  (doc) =>
-                                      _normalizedSectionKey(
-                                        doc.data()['section'] as String? ?? '',
-                                      ) ==
-                                      sectionKey,
-                                )
-                                .length ??
-                            0;
-                        return _CardLine(
-                          icon: Icons.groups_outlined,
-                          value:
-                              '$count ${count == 1 ? 'student' : 'students'}',
-                        );
-                      },
-                    );
-                  },
+                const SizedBox(width: 4),
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withAlpha(18),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    Icons.meeting_room_outlined,
+                    size: 21,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
                 ),
               ],
-            ),
-          ),
+            );
+            final adviser = _SectionAdviserLine(section: data);
+            final enrollment = Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.groups_outlined,
+                  size: 18,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 7),
+                Text(
+                  '$studentCount ${studentCount == 1 ? 'student' : 'students'}',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            );
+            if (compact) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  identity,
+                  const SizedBox(height: 12),
+                  adviser,
+                  const SizedBox(height: 9),
+                  enrollment,
+                ],
+              );
+            }
+            return Row(
+              children: [
+                Expanded(flex: 3, child: identity),
+                const SizedBox(width: 18),
+                Expanded(flex: 3, child: adviser),
+                const SizedBox(width: 18),
+                SizedBox(width: 120, child: enrollment),
+                const SizedBox(width: 48),
+                Icon(
+                  Icons.chevron_right,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 16),
+              ],
+            );
+          },
         ),
       ),
     );
-  }
-
-  Future<void> _downloadStudentQrZip(
-    BuildContext context,
-    Map<String, dynamic> section,
-  ) async {
-    final messenger = ScaffoldMessenger.of(context);
-    final app = SchoolAdminViewModelScope.of(context);
-    final overlay = Overlay.of(context, rootOverlay: true);
-    final progress = ValueNotifier(
-      const SectionQrExportProgress(current: 0, total: 0),
-    );
-    final overlayEntry = OverlayEntry(
-      builder: (_) => _SectionQrExportPanel(progress: progress),
-    );
-    overlay.insert(overlayEntry);
-    try {
-      await Future<void>.delayed(const Duration(milliseconds: 120));
-      await SectionQrExporter(app.app).downloadSectionZip(
-        section,
-        onProgress: (value) => progress.value = value,
-      );
-      progress.value = progress.value.asDone();
-      await Future<void>.delayed(const Duration(milliseconds: 900));
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Student QR ZIP downloaded.')),
-      );
-    } catch (error) {
-      progress.value = progress.value.asError(_friendlyDownloadError(error));
-      await Future<void>.delayed(const Duration(seconds: 2));
-      messenger.showSnackBar(
-        SnackBar(content: Text(_friendlyDownloadError(error))),
-      );
-    } finally {
-      overlayEntry.remove();
-      progress.dispose();
-    }
-  }
-
-  String _friendlyDownloadError(Object error) {
-    final message = error.toString().replaceFirst('Exception: ', '').trim();
-    return message.isEmpty ? 'Unable to download student QR ZIP.' : message;
   }
 
   static String formatAdviserName(String value) {
@@ -196,21 +121,15 @@ class _SectionCard extends StatelessWidget {
         .where((part) => part.isNotEmpty)
         .toList();
     if (commaParts.length >= 2) {
-      final lastName = commaParts[0];
-      final firstName = commaParts[1];
-      final middleName = commaParts.length >= 3 ? commaParts[2] : '';
-      final middleInitial = middleName.isEmpty ? '' : ' ${middleName[0]}.';
-      return '$lastName, $firstName$middleInitial';
+      final middleInitial = commaParts.length >= 3 && commaParts[2].isNotEmpty
+          ? ' ${commaParts[2][0]}.'
+          : '';
+      return '${commaParts[0]}, ${commaParts[1]}$middleInitial';
     }
-
     final parts = raw.split(RegExp(r'\s+'));
-    if (parts.length >= 2) {
-      final lastName = parts.last;
-      final firstName = parts.first;
-      final middleInitial = parts.length >= 3 ? ' ${parts[1][0]}.' : '';
-      return '$lastName, $firstName$middleInitial';
-    }
-    return raw;
+    if (parts.length < 2) return raw;
+    final middleInitial = parts.length >= 3 ? ' ${parts[1][0]}.' : '';
+    return '${parts.last}, ${parts.first}$middleInitial';
   }
 }
 
@@ -226,7 +145,6 @@ class _SectionAdviserLine extends StatelessWidget {
     if (adviserDocId.isEmpty) {
       return const _CardLine(icon: Icons.person_outline, value: 'No adviser');
     }
-
     return FutureBuilder(
       future: app.attendance.activeSchoolYear(),
       builder: (context, schoolYearSnapshot) {
@@ -237,7 +155,6 @@ class _SectionAdviserLine extends StatelessWidget {
             value: 'No adviser',
           );
         }
-
         return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
           stream: app.repository
               .schoolYearCollection(schoolYear.id, 'teachers')
@@ -267,101 +184,3 @@ class _SectionAdviserLine extends StatelessWidget {
     );
   }
 }
-
-class _SectionQrExportPanel extends StatelessWidget {
-  const _SectionQrExportPanel({required this.progress});
-
-  final ValueNotifier<SectionQrExportProgress> progress;
-
-  @override
-  Widget build(BuildContext context) {
-    return Positioned(
-      right: 24,
-      bottom: 24,
-      child: Material(
-        elevation: 14,
-        borderRadius: BorderRadius.circular(8),
-        color: Theme.of(context).colorScheme.surface,
-        child: Container(
-          width: 360,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: Theme.of(context).colorScheme.outlineVariant,
-            ),
-          ),
-          child: ValueListenableBuilder<SectionQrExportProgress>(
-            valueListenable: progress,
-            builder: (context, value, _) {
-              final hasError = value.errorMessage.isNotEmpty;
-              final title = hasError
-                  ? 'Download failed'
-                  : value.done
-                  ? 'Download ready'
-                  : 'Preparing student QR ZIP';
-              final status = hasError
-                  ? value.errorMessage
-                  : value.done
-                  ? 'Starting ZIP download...'
-                  : value.total == 0
-                  ? 'Loading students...'
-                  : 'Generated ${value.current} of ${value.total} QR IDs';
-
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        hasError
-                            ? Icons.error_outline
-                            : value.done
-                            ? Icons.check_circle_outline
-                            : Icons.archive_outlined,
-                        color: hasError
-                            ? Theme.of(context).colorScheme.error
-                            : Theme.of(context).colorScheme.primary,
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          title,
-                          style: Theme.of(context).textTheme.titleSmall
-                              ?.copyWith(fontWeight: FontWeight.w800),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  LinearProgressIndicator(
-                    value: hasError || value.done ? 1 : value.value,
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    status,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                  if (value.studentName.isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    Text(
-                      value.studentName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
-                ],
-              );
-            },
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-enum _SectionCardAction { downloadQr, edit, archive }

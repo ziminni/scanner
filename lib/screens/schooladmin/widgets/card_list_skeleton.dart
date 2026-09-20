@@ -25,23 +25,32 @@ class _CardSkeleton extends StatelessWidget {
     return DataSurface(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _Box(w: 150, h: 22, color: bg),
-                  const SizedBox(height: 6),
-                  _Box(w: 190, h: 13, color: bg),
-                ],
-              ),
+            Row(
+              children: [
+                _Box(w: 44, h: 44, color: bg),
+                const SizedBox(width: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _Box(w: 150, h: 22, color: bg),
+                    const SizedBox(height: 6),
+                    _Box(w: 190, h: 13, color: bg),
+                  ],
+                ),
+              ],
             ),
-            _Box(w: 200, h: 13, color: bg),
-            const SizedBox(width: 8),
-            Icon(
-              Icons.keyboard_arrow_down,
-              color: Theme.of(context).colorScheme.outlineVariant,
+            const SizedBox(height: 18),
+            Divider(color: Theme.of(context).colorScheme.outlineVariant),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 12,
+              runSpacing: 10,
+              children: [
+                for (var i = 0; i < 3; i++) _Box(w: 180, h: 54, color: bg),
+              ],
             ),
           ],
         ),

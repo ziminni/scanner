@@ -54,6 +54,9 @@ class _AttendanceLogsTableState extends State<AttendanceLogsTable> {
       return FutureBuilder<SchoolYear?>(
         future: app.attendance.activeSchoolYear(),
         builder: (context, schoolYearSnapshot) {
+          if (schoolYearSnapshot.connectionState == ConnectionState.waiting) {
+            return const AdminTableSkeleton(columns: 10);
+          }
           final schoolYear = schoolYearSnapshot.data;
           if (schoolYear == null) {
             return const EmptyState(title: 'No attendance logs found');
@@ -61,6 +64,9 @@ class _AttendanceLogsTableState extends State<AttendanceLogsTable> {
           return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
             stream: app.repository.activeTeachersStream(schoolYear.id),
             builder: (context, teachersSnapshot) {
+              if (teachersSnapshot.connectionState == ConnectionState.waiting) {
+                return const AdminTableSkeleton(columns: 10);
+              }
               final teacherSchedules = {
                 for (final doc in teachersSnapshot.data?.docs ?? [])
                   (doc.data()['teacherId'] as String? ?? '').trim():
@@ -83,6 +89,9 @@ class _AttendanceLogsTableState extends State<AttendanceLogsTable> {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: app.attendance.logsStream(limit: widget.limit),
       builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const AdminTableSkeleton(columns: 10);
+        }
         final query = widget.search.toLowerCase();
         final logs = (snapshot.data?.docs ?? []).map(AttendanceLog.fromDoc).where((
           log,
@@ -245,6 +254,9 @@ class GatePassLogsTable extends StatelessWidget {
       return FutureBuilder<SchoolYear?>(
         future: app.attendance.activeSchoolYear(),
         builder: (context, schoolYearSnapshot) {
+          if (schoolYearSnapshot.connectionState == ConnectionState.waiting) {
+            return const AdminTableSkeleton(columns: 13);
+          }
           final schoolYear = schoolYearSnapshot.data;
           if (schoolYear == null) {
             return const EmptyState(title: 'No gate pass logs found');
@@ -252,6 +264,9 @@ class GatePassLogsTable extends StatelessWidget {
           return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
             stream: app.repository.activeTeachersStream(schoolYear.id),
             builder: (context, teachersSnapshot) {
+              if (teachersSnapshot.connectionState == ConnectionState.waiting) {
+                return const AdminTableSkeleton(columns: 13);
+              }
               final teacherSchedules = {
                 for (final doc in teachersSnapshot.data?.docs ?? [])
                   (doc.data()['teacherId'] as String? ?? '').trim():
@@ -274,6 +289,9 @@ class GatePassLogsTable extends StatelessWidget {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: app.attendance.gatePassLogsStream(limit: limit),
       builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const AdminTableSkeleton(columns: 13);
+        }
         final query = search.toLowerCase();
         final logs = (snapshot.data?.docs ?? []).map(GatePassLog.fromDoc).where((
           log,

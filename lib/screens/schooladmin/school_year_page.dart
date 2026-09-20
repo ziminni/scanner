@@ -13,9 +13,9 @@ import 'viewmodels/school_admin_viewmodel.dart';
 
 part 'widgets/school_year_card.dart';
 part 'widgets/school_year_meta.dart';
-part 'widgets/school_year_details.dart';
+part 'widgets/school_year_page_intro.dart';
+part 'widgets/school_year_stat_tile.dart';
 part 'widgets/status_pill.dart';
-part 'widgets/yellow_badge.dart';
 part 'widgets/term_chip.dart';
 part 'widgets/card_list_skeleton.dart';
 part 'widgets/school_year_box.dart';
@@ -78,6 +78,9 @@ class _SchoolYearPageState extends State<SchoolYearPage> {
             FutureBuilder<SchoolYear?>(
               future: _viewModel.activeSchoolYear(),
               builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const SizedBox.shrink();
+                }
                 // Only show the Create button when there is no active year
                 if (snapshot.data != null) return const SizedBox.shrink();
                 return FilledButton.icon(
@@ -109,30 +112,60 @@ class _SchoolYearPageState extends State<SchoolYearPage> {
                     ..sort(_sortDescending);
 
               if (schoolYears.isEmpty) {
-                return const EmptyState(
-                  title: 'No school years yet',
-                  subtitle:
-                      'Create a school year to start tracking attendance.',
-                );
+                return const _SchoolYearPageIntro(activeSchoolYear: null);
               }
 
-              return ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: schoolYears.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 12),
-                itemBuilder: (context, index) {
-                  final sy = schoolYears[index];
-                  return _SchoolYearCard(
-                    schoolYear: sy,
-                    onArchive: sy.isActive
-                        ? () async {
-                            await _viewModel.archiveActive(sy);
+              final activeSchoolYear = schoolYears
+                  .where((schoolYear) => schoolYear.isActive)
+                  .firstOrNull;
+              final previousSchoolYears = schoolYears
+                  .where((schoolYear) => schoolYear.id != activeSchoolYear?.id)
+                  .toList();
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _SchoolYearPageIntro(
+                    activeSchoolYear: activeSchoolYear,
+                    onArchive: activeSchoolYear == null
+                        ? null
+                        : () async {
+                            await _viewModel.archiveActive(activeSchoolYear);
                             if (mounted) setState(() {});
-                          }
-                        : null,
-                  );
-                },
+                          },
+                  ),
+                  const SizedBox(height: 26),
+                  Text(
+                    'School year history',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Previously completed and inactive academic years.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  if (previousSchoolYears.isEmpty)
+                    const EmptyState(
+                      title: 'No previous school years',
+                      subtitle:
+                          'Completed school years will be listed here for reference.',
+                    )
+                  else
+                    ListView.separated(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: previousSchoolYears.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 10),
+                      itemBuilder: (context, index) => _SchoolYearCard(
+                        schoolYear: previousSchoolYears[index],
+                      ),
+                    ),
+                ],
               );
             },
           ),
@@ -157,10 +190,17 @@ class _SchoolYearPageState extends State<SchoolYearPage> {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _SYCounts {
-  const _SYCounts({required this.enrollments, required this.sections});
+  const _SYCounts({
+    required this.students,
+    required this.teachers,
+    required this.sections,
+    required this.attendanceLogs,
+  });
 
-  final int enrollments;
+  final int students;
+  final int teachers;
   final int sections;
+  final int attendanceLogs;
 
   static Future<_SYCounts> load(AppController app, String schoolYearId) async {
     final results = await Future.wait([
@@ -170,14 +210,25 @@ class _SYCounts {
           .count()
           .get(),
       app.repository
+          .schoolYearCollection(schoolYearId, 'teachers')
+          .where('archived', isEqualTo: false)
+          .count()
+          .get(),
+      app.repository
           .rootCollection('sections')
           .where('archived', isEqualTo: false)
           .count()
           .get(),
+      app.repository
+          .schoolYearCollection(schoolYearId, 'attendance_logs')
+          .count()
+          .get(),
     ]);
     return _SYCounts(
-      enrollments: results[0].count ?? 0,
-      sections: results[1].count ?? 0,
+      students: results[0].count ?? 0,
+      teachers: results[1].count ?? 0,
+      sections: results[2].count ?? 0,
+      attendanceLogs: results[3].count ?? 0,
     );
   }
 }

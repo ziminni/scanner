@@ -384,7 +384,25 @@ class _DashboardLoadingCard extends StatelessWidget {
                 fontWeight: FontWeight.w900,
               ),
             ),
-            const Expanded(child: Center(child: CircularProgressIndicator())),
+            const SizedBox(height: 22),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (var index = 0; index < 4; index++) ...[
+                    Container(
+                      width: index.isEven ? double.infinity : 210,
+                      height: index == 0 ? 58 : 14,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    if (index < 3) const SizedBox(height: 14),
+                  ],
+                ],
+              ),
+            ),
           ],
         ),
       ),
